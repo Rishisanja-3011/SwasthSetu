@@ -12,6 +12,10 @@ from extraction.plausibility import (
     check_report_plausibility
 )
 
+from extraction.coverage import (
+    check_cbc_coverage
+)
+
 
 # =========================================================
 # CONFIGURATION
@@ -185,7 +189,110 @@ def display_plausibility(
 
 
 # =========================================================
-# USER CORRECTION
+# DISPLAY CBC COVERAGE
+# =========================================================
+
+def display_coverage(
+    coverage: dict
+):
+
+    print("\n========================================")
+    print("          CBC COVERAGE")
+    print("========================================")
+
+    print(
+        "Status:",
+        coverage["status"]
+    )
+
+    print(
+        "Expected supported markers:",
+        coverage["expected_count"]
+    )
+
+    print(
+        "Detected unique markers:",
+        coverage["detected_count"]
+    )
+
+    print(
+        "Missing markers:",
+        coverage["missing_count"]
+    )
+
+    print(
+        "Coverage:",
+        f"{coverage['coverage_percent']}%"
+    )
+
+    # -----------------------------------------------------
+    # Missing
+    # -----------------------------------------------------
+
+    if coverage["missing_markers"]:
+
+        print("\nMissing supported markers:")
+
+        for marker in coverage[
+            "missing_markers"
+        ]:
+
+            print(
+                "-",
+                marker
+            )
+
+    # -----------------------------------------------------
+    # Duplicates
+    # -----------------------------------------------------
+
+    if coverage["duplicate_markers"]:
+
+        print("\nDuplicate markers detected:")
+
+        for marker in coverage[
+            "duplicate_markers"
+        ]:
+
+            print(
+                "-",
+                marker
+            )
+
+    # -----------------------------------------------------
+    # Unknown
+    # -----------------------------------------------------
+
+    if coverage["unknown_markers"]:
+
+        print("\nUnknown markers:")
+
+        for marker in coverage[
+            "unknown_markers"
+        ]:
+
+            print(
+                "-",
+                marker
+            )
+
+    # -----------------------------------------------------
+    # Complete
+    # -----------------------------------------------------
+
+    if (
+        coverage["status"] == "COMPLETE"
+        and not coverage["duplicate_markers"]
+    ):
+
+        print(
+            "\n✓ All currently supported CBC "
+            "markers were detected."
+        )
+
+
+# =========================================================
+# USER CORRECTIONS
 # =========================================================
 
 def request_patient_corrections(
@@ -225,11 +332,16 @@ def request_patient_corrections(
 
                 try:
 
-                    age = int(answer)
+                    age = int(
+                        answer
+                    )
 
                     if 0 < age <= 120:
 
-                        corrections["age"] = age
+                        corrections[
+                            "age"
+                        ] = age
+
                         break
 
                     print(
@@ -264,9 +376,11 @@ def request_patient_corrections(
 
                 if answer in aliases:
 
-                    corrections["sex"] = (
-                        aliases[answer]
-                    )
+                    corrections[
+                        "sex"
+                    ] = aliases[
+                        answer
+                    ]
 
                     break
 
@@ -278,7 +392,7 @@ def request_patient_corrections(
 
 
 # =========================================================
-# MAIN
+# MAIN PIPELINE
 # =========================================================
 
 def main():
@@ -290,29 +404,37 @@ def main():
     try:
 
         # =================================================
-        # STEP 1 — PDF
+        # STEP 1 — READ PDF
         # =================================================
 
-        print("\n[1/7] Reading PDF...")
+        print(
+            "\n[1/8] Reading PDF..."
+        )
 
         raw_text = extract_pdf_text(
             PDF_PATH
         )
 
-        print("✓ PDF text extracted")
+        print(
+            "✓ PDF text extracted"
+        )
 
 
         # =================================================
         # STEP 2 — CLEAN
         # =================================================
 
-        print("\n[2/7] Cleaning extracted text...")
+        print(
+            "\n[2/8] Cleaning extracted text..."
+        )
 
         cleaned_text = clean_pdf_text(
             raw_text
         )
 
-        print("✓ Text cleaned")
+        print(
+            "✓ Text cleaned"
+        )
 
 
         # =================================================
@@ -320,7 +442,7 @@ def main():
         # =================================================
 
         print(
-            "\n[3/7] Extracting patient context..."
+            "\n[3/8] Extracting patient context..."
         )
 
         patient = extract_patient_context(
@@ -333,11 +455,11 @@ def main():
 
 
         # =================================================
-        # STEP 4 — CBC
+        # STEP 4 — CBC PARSING
         # =================================================
 
         print(
-            "\n[4/7] Extracting CBC tests..."
+            "\n[4/8] Extracting CBC tests..."
         )
 
         tests = parse_cbc(
@@ -350,11 +472,28 @@ def main():
 
 
         # =================================================
-        # STEP 5 — STRUCTURAL VALIDATION
+        # STEP 5 — COVERAGE
         # =================================================
 
         print(
-            "\n[5/7] Validating report structure..."
+            "\n[5/8] Checking CBC extraction coverage..."
+        )
+
+        coverage = check_cbc_coverage(
+            tests
+        )
+
+        print(
+            "✓ CBC coverage check completed"
+        )
+
+
+        # =================================================
+        # STEP 6 — STRUCTURAL VALIDATION
+        # =================================================
+
+        print(
+            "\n[6/8] Validating report structure..."
         )
 
         validation = validate_report(
@@ -366,6 +505,11 @@ def main():
             "✓ Structural validation completed"
         )
 
+
+        # =================================================
+        # DISPLAY CURRENT EXTRACTION
+        # =================================================
+
         display_patient(
             patient
         )
@@ -374,21 +518,26 @@ def main():
             tests
         )
 
+        display_coverage(
+            coverage
+        )
+
         display_validation(
             validation
         )
 
 
         # =================================================
-        # STEP 6 — PATIENT CORRECTION LOOP
+        # STEP 7 — PATIENT CORRECTIONS
         # =================================================
 
         print(
-            "\n[6/7] Checking whether "
+            "\n[7/8] Checking whether "
             "patient corrections are required..."
         )
 
         correction_attempts = 0
+
         max_correction_attempts = 3
 
         while (
@@ -442,7 +591,7 @@ def main():
 
 
         # =================================================
-        # STEP 7 — PLAUSIBILITY
+        # STEP 8 — PLAUSIBILITY
         # =================================================
 
         plausibility = None
@@ -450,14 +599,9 @@ def main():
         if validation["can_analyze"]:
 
             print(
-                "\n[7/7] Running extraction "
+                "\n[8/8] Running extraction "
                 "plausibility checks..."
             )
-
-            # IMPORTANT:
-            #
-            # Run plausibility only against tests that
-            # already passed structural validation.
 
             structurally_valid_tests = (
                 validation.get(
@@ -483,7 +627,7 @@ def main():
         else:
 
             print(
-                "\n[7/7] Plausibility check skipped."
+                "\n[8/8] Plausibility check skipped."
             )
 
             print(
@@ -500,11 +644,14 @@ def main():
         print("          SYSTEM DECISION")
         print("========================================")
 
+
         # -------------------------------------------------
-        # Cannot structurally analyze
+        # STRUCTURAL FAILURE
         # -------------------------------------------------
 
-        if not validation["can_analyze"]:
+        if not validation[
+            "can_analyze"
+        ]:
 
             print(
                 "✗ Report is not ready for analysis."
@@ -519,7 +666,7 @@ def main():
 
 
         # -------------------------------------------------
-        # Suspicious extraction
+        # PLAUSIBILITY FAILURE
         # -------------------------------------------------
 
         if (
@@ -539,42 +686,93 @@ def main():
             )
 
             print(
-                "These values must be checked against "
-                "the original report before they are "
-                "used for medical interpretation."
+                "Verify them against the original "
+                "report before interpretation."
             )
 
             return
 
 
         # -------------------------------------------------
-        # Partial
+        # COVERAGE WARNING
         # -------------------------------------------------
 
-        if validation["status"] == "PARTIAL":
+        if coverage[
+            "status"
+        ] != "COMPLETE":
 
             print(
-                "⚠ Report is partially usable."
+                "⚠ CBC extraction is incomplete."
             )
 
             print(
-                f"✓ {validation['valid_tests']} "
-                "structurally valid tests are available."
+                f"Detected "
+                f"{coverage['detected_count']} of "
+                f"{coverage['expected_count']} "
+                "currently supported markers."
             )
 
             print(
-                "⚠ Incomplete tests will not be used."
+                "Missing markers should be reviewed "
+                "before treating this extraction as "
+                "a complete CBC."
             )
 
             return
 
 
         # -------------------------------------------------
-        # Ready
+        # DUPLICATES
+        # -------------------------------------------------
+
+        if coverage[
+            "duplicate_markers"
+        ]:
+
+            print(
+                "⚠ Duplicate CBC markers were detected."
+            )
+
+            print(
+                "The extraction should be reviewed "
+                "before interpretation."
+            )
+
+            return
+
+
+        # -------------------------------------------------
+        # PARTIAL STRUCTURAL DATA
+        # -------------------------------------------------
+
+        if validation[
+            "status"
+        ] == "PARTIAL":
+
+            print(
+                "⚠ Report contains incomplete "
+                "test data."
+            )
+
+            print(
+                "Incomplete tests will not be used "
+                "for interpretation."
+            )
+
+            return
+
+
+        # -------------------------------------------------
+        # READY
         # -------------------------------------------------
 
         print(
             "✓ Report passed structural validation."
+        )
+
+        print(
+            "✓ CBC extraction coverage is complete "
+            "for the current parser profile."
         )
 
         print(
@@ -596,7 +794,9 @@ def main():
         print("              ERROR")
         print("========================================")
 
-        print(error)
+        print(
+            error
+        )
 
 
     except ValueError as error:
@@ -605,7 +805,9 @@ def main():
         print("              ERROR")
         print("========================================")
 
-        print(error)
+        print(
+            error
+        )
 
 
     except Exception as error:
@@ -624,4 +826,5 @@ def main():
 # =========================================================
 
 if __name__ == "__main__":
+
     main()
