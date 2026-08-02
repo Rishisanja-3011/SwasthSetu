@@ -10,9 +10,12 @@ from knowledge_engine.core.enums import AgeUnit, Sex
 @dataclass(frozen=True, slots=True)
 class Patient:
     """
-    Patient demographic information.
+    Represents the patient whose laboratory
+    report is being interpreted.
     """
 
     sex: Sex
+
     age_value: float
+
     age_unit: AgeUnit
