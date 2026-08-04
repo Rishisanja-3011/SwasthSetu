@@ -1,8 +1,8 @@
 """
 Clinical Finding domain model.
 
-A Finding represents the clinical interpretation
-of one validated laboratory result.
+A Finding is the standardized clinical interpretation
+of one laboratory result.
 """
 
 from dataclasses import dataclass
@@ -14,15 +14,15 @@ from .lab_result import LabResult
 @dataclass(frozen=True, slots=True)
 class Finding:
     """
-    Standardized clinical finding.
+    Represents one interpreted laboratory finding.
 
-    Example:
+    Example
+    -------
+    Hemoglobin
 
-        Hemoglobin
-        ↓
-        LOW
-        ↓
-        Mild
+        value = 11.2
+        status = LOW
+        severity = UNKNOWN
     """
 
     result: LabResult
@@ -31,9 +31,25 @@ class Finding:
 
     severity: Severity = Severity.UNKNOWN
 
-    notes: str | None = None
+    reason: str | None = None
 
     @property
-    def test(self) -> str:
-        """Canonical laboratory test name."""
+    def test_name(self) -> str:
+        """
+        Canonical laboratory test name.
+        """
         return self.result.test_name
+
+    @property
+    def value(self) -> float:
+        """
+        Laboratory value.
+        """
+        return self.result.value
+
+    @property
+    def unit(self) -> str:
+        """
+        Laboratory unit.
+        """
+        return self.result.unit

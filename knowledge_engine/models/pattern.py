@@ -1,5 +1,7 @@
 """
 Clinical Pattern domain model.
+
+Represents one medical knowledge pattern.
 """
 
 from dataclasses import dataclass, field
@@ -12,7 +14,7 @@ from .finding_requirement import FindingRequirement
 @dataclass(frozen=True, slots=True)
 class Pattern:
     """
-    Medical knowledge loaded from YAML.
+    One clinical reasoning pattern.
     """
 
     id: str
@@ -22,6 +24,8 @@ class Pattern:
     category: PatternCategory
 
     description: str
+
+    priority: int = 100
 
     required: tuple[FindingRequirement, ...] = field(default_factory=tuple)
 

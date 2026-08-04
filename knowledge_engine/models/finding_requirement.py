@@ -1,5 +1,8 @@
 """
-Pattern finding requirement.
+Finding Requirement domain model.
+
+Represents one laboratory condition required by
+a clinical pattern.
 """
 
 from dataclasses import dataclass
@@ -10,11 +13,14 @@ from knowledge_engine.core.enums import LabStatus, Severity
 @dataclass(frozen=True, slots=True)
 class FindingRequirement:
     """
-    One required/supportive finding
-    inside a clinical pattern.
+    One expected laboratory finding.
+
+    Example
+    -------
+    Hemoglobin must be LOW.
     """
 
-    test: str
+    test_name: str
 
     status: LabStatus
 
