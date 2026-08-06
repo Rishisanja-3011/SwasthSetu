@@ -1,23 +1,25 @@
 """
-Evidence collected while matching a pattern.
+Evidence domain model.
+
+Represents the evidence collected for one
+matched clinical pattern.
 """
 
 from dataclasses import dataclass, field
 
 from .finding import Finding
-from .finding_requirement import FindingRequirement
 
 
 @dataclass(frozen=True, slots=True)
 class Evidence:
     """
-    Explains WHY a pattern matched.
+    Patient-specific evidence for one pattern.
     """
 
-    matched: tuple[Finding, ...] = field(default_factory=tuple)
+    matched_required: tuple[Finding, ...] = field(default_factory=tuple)
 
-    supportive: tuple[Finding, ...] = field(default_factory=tuple)
+    matched_supportive: tuple[Finding, ...] = field(default_factory=tuple)
 
-    missing: tuple[FindingRequirement, ...] = field(default_factory=tuple)
+    missing_required: tuple[str, ...] = field(default_factory=tuple)
 
     contradictory: tuple[Finding, ...] = field(default_factory=tuple)
