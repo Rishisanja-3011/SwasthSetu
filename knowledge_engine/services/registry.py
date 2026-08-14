@@ -1,20 +1,30 @@
 """
 Knowledge registry.
 
-Responsible for converting validated knowledge documents
-into Pattern domain objects and storing them for retrieval.
+Responsible for:
+1. Loading knowledge documents.
+2. Validating their schema.
+3. Converting them into Pattern domain objects.
+4. Storing and retrieving registered patterns.
 
 The registry does not perform clinical matching.
 """
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
+
+import yaml
 
 from knowledge_engine.core.enums import (
     LabStatus,
     PatternCategory,
     Severity,
+)
+
+from knowledge_engine.knowledge.schema import (
+    KnowledgeSchemaValidator,
 )
 
 from knowledge_engine.models.finding_requirement import (
@@ -25,7 +35,7 @@ from knowledge_engine.models.pattern import Pattern
 
 
 class KnowledgeRegistryError(ValueError):
-    """Raised when knowledge cannot be registered."""
+    """Raised when knowledge cannot be registered or loaded."""
 
 
 class KnowledgeRegistry:
@@ -53,6 +63,47 @@ class KnowledgeRegistry:
 
         return pattern
 
+    def load_file(self, path: str | Path) -> Pattern:
+        """
+        Load one YAML knowledge file, validate it,
+        convert it into a Pattern, and register it.
+        """
+
+        file_path = Path(path)
+
+        if not file_path.exists():
+            raise KnowledgeRegistryError(
+                f"Knowledge file does not exist: {file_path}"
+            )
+
+        if not file_path.is_file():
+            raise KnowledgeRegistryError(
+                f"Knowledge path is not a file: {file_path}"
+            )
+
+        try:
+            with file_path.open(
+                "r",
+                encoding="utf-8",
+            ) as handle:
+                document = yaml.safe_load(handle)
+
+        except yaml.YAMLError as exc:
+            raise KnowledgeRegistryError(
+                f"Invalid YAML file: {file_path}"
+            ) from exc
+
+        try:
+            KnowledgeSchemaValidator.validate(document)
+
+        except Exception as exc:
+            raise KnowledgeRegistryError(
+                f"Knowledge schema validation failed "
+                f"for '{file_path}': {exc}"
+            ) from exc
+
+        return self.register(document)
+
     def get(self, pattern_id: str) -> Pattern:
         """
         Retrieve a registered pattern by ID.
@@ -75,7 +126,7 @@ class KnowledgeRegistry:
 
     def count(self) -> int:
         """
-        Return number of registered patterns.
+        Return the number of registered patterns.
         """
 
         return len(self._patterns)

@@ -5,7 +5,7 @@ name: Example CBC Pattern
 category: cbc
 
 description: >
-  Synthetic pattern used to validate the knowledge schema.
+  Synthetic pattern used to test YAML loading.
   This is not a clinical diagnosis.
 
 priority: 100
@@ -26,4 +26,4 @@ contradictory:
     status: high
 
 possible_explanations:
-  - example explanation
+  - Synthetic explanation for testing.

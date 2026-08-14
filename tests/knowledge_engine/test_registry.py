@@ -2,16 +2,13 @@
 Tests for KnowledgeRegistry.
 """
 
-from knowledge_engine.core.enums import (
-    LabStatus,
-    PatternCategory,
-)
+from pathlib import Path
 
+from knowledge_engine.core.enums import LabStatus
 from knowledge_engine.models.pattern import Pattern
 from knowledge_engine.models.finding_requirement import (
     FindingRequirement,
 )
-
 from knowledge_engine.services.registry import (
     KnowledgeRegistry,
     KnowledgeRegistryError,
@@ -247,6 +244,87 @@ def test_missing_pattern():
         passed()
 
 
+def test_load_yaml_file():
+
+    print_header("TEST 10 — LOAD YAML FILE")
+
+    registry = KnowledgeRegistry()
+
+    path = Path(
+        "knowledge_engine/knowledge/cbc/patterns/example_pattern.yaml"
+    )
+
+    pattern = registry.load_file(path)
+
+    assert isinstance(pattern, Pattern)
+    assert pattern.id == "example_cbc_pattern"
+    assert pattern.name == "Example CBC Pattern"
+    assert registry.count() == 1
+
+    passed()
+
+
+def test_missing_yaml_file():
+
+    print_header("TEST 11 — MISSING YAML FILE")
+
+    registry = KnowledgeRegistry()
+
+    try:
+
+        registry.load_file(
+            "knowledge_engine/knowledge/cbc/patterns/does_not_exist.yaml"
+        )
+
+        assert False
+
+    except KnowledgeRegistryError:
+
+        passed()
+
+
+def test_invalid_yaml_schema():
+
+    print_header("TEST 12 — INVALID YAML SCHEMA")
+
+    registry = KnowledgeRegistry()
+
+    path = Path(
+        "knowledge_engine/knowledge/cbc/patterns/"
+        "invalid_pattern.yaml"
+    )
+
+    path.write_text(
+        """
+id: invalid_pattern
+
+name: Invalid Pattern
+
+category: cbc
+
+description: Invalid test
+
+required:
+  - status: maybe
+""",
+        encoding="utf-8",
+    )
+
+    try:
+
+        registry.load_file(path)
+
+        assert False
+
+    except KnowledgeRegistryError:
+
+        passed()
+
+    finally:
+
+        path.unlink(missing_ok=True)
+
+
 if __name__ == "__main__":
 
     test_register()
@@ -258,6 +336,10 @@ if __name__ == "__main__":
     test_count()
     test_duplicate()
     test_missing_pattern()
+
+    test_load_yaml_file()
+    test_missing_yaml_file()
+    test_invalid_yaml_schema()
 
     finished(
         "ALL REGISTRY TESTS PASSED"
