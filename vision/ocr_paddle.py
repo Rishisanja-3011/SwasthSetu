@@ -154,7 +154,8 @@ class PaddleOCREngine(BaseOCREngine):
                 use_doc_orientation_classify=False,
                 use_doc_unwarping=False,
                 use_textline_orientation=False,
-                device=device
+                device=device,
+                enable_mkldnn=False,
             )
 
         except Exception as error:
@@ -396,7 +397,15 @@ class PaddleOCREngine(BaseOCREngine):
         """
 
         self._validate_input(image)
+        ocr_image = image
 
+        if image.ndim == 2:
+            import cv2
+
+            ocr_image = cv2.cvtColor(
+         image,
+            cv2.COLOR_GRAY2BGR,
+            )
         self._load_model()
 
         logger.debug(
@@ -408,7 +417,7 @@ class PaddleOCREngine(BaseOCREngine):
 
         try:
 
-            raw_results = self._model.predict(image)
+            raw_results = self._model.predict(ocr_image)
 
         except Exception as error:
             raise RuntimeError(

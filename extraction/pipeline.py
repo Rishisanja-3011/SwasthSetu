@@ -362,13 +362,33 @@ def process(
         if not path.exists():
             raise FileNotFoundError(f"File not found: {path}")
 
-        if path.suffix.lower() != ".pdf":
+        suffix = path.suffix.lower()
+
+        # --------------------------------------------------
+        # IMAGE FILE PATH
+        # --------------------------------------------------
+        # Image paths use the same Vision/OCR path as numpy
+        # image arrays. This keeps file-based images and
+        # already-loaded images on the same extraction path.
+        if suffix in {".png", ".jpg", ".jpeg", ".bmp", ".tif", ".tiff", ".webp"}:
+            from vision.preprocessor import load_image
+
+            logger.info("pipeline: input=image path=%s", path.name)
+            image = load_image(path)
+            raw_text, meta = _process_image(
+                image,
+                ocr_engine=ocr_engine,
+            )
+            meta.path = str(path)
+
+        elif suffix != ".pdf":
             raise ValueError(
                 f"Unsupported file type: {path.suffix!r}. "
-                "Only .pdf files and numpy image arrays are supported."
+                "Supported inputs are PDF files, image files, "
+                "or numpy image arrays."
             )
 
-        if force_ocr:
+        elif force_ocr:
             logger.info("pipeline: input=scanned_pdf (forced) path=%s", path.name)
             raw_text, meta = _process_scanned_pdf(
                 path, ocr_engine=ocr_engine, dpi=dpi

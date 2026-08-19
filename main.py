@@ -1,830 +1,500 @@
-from extraction.pdf_reader import extract_pdf_text
-from extraction.text_cleaner import clean_pdf_text
-from extraction.parser import parse_cbc
-from extraction.patient_parser import extract_patient_context
+"""
+Application entry point for the Blood Report Analysis AI.
 
-from extraction.validator import (
-    validate_report,
-    apply_patient_corrections
-)
+The application delegates the clinical workflow to ClinicalPipeline.
 
-from extraction.plausibility import (
-    check_report_plausibility
-)
+Pipeline:
 
-from extraction.coverage import (
-    check_cbc_coverage
-)
+    input
+      -> input routing
+      -> extraction
+      -> validation
+      -> reference resolution
+      -> finding generation
+      -> knowledge engine
+"""
+
+from __future__ import annotations
+
+import sys
+from pathlib import Path
+
+from clinical_pipeline import ClinicalPipeline
+from knowledge_engine.services.engine import KnowledgeEngine
+from knowledge_engine.services.matcher import KnowledgeMatcher
+from knowledge_engine.services.registry import KnowledgeRegistry
+from knowledge_engine.services.scorer import KnowledgeScorer
 
 
-# =========================================================
-# CONFIGURATION
-# =========================================================
-
-PDF_PATH = "samples/reports/sample.pdf"
+DEFAULT_REPORT = Path("samples/reports/sample.png")
+PATTERN_ROOT = Path("knowledge_engine/knowledge")
 
 
-# =========================================================
-# DISPLAY PATIENT
-# =========================================================
+def get_value(obj, key, default=None):
+    """
+    Safely read a value from either:
 
-def display_patient(patient: dict):
+    - an object with attributes
+    - a dictionary
+
+    The application entry point must not impose
+    a different domain-model structure on the
+    existing clinical pipeline.
+    """
+
+    if obj is None:
+        return default
+
+    if isinstance(obj, dict):
+        return obj.get(key, default)
+
+    return getattr(obj, key, default)
+
+
+def build_knowledge_engine() -> KnowledgeEngine:
+    """Load all YAML knowledge patterns."""
+
+    registry = KnowledgeRegistry()
+
+    pattern_files = sorted(
+        PATTERN_ROOT.rglob("patterns/*.yaml")
+    )
+
+    if not pattern_files:
+        raise RuntimeError(
+            f"No knowledge pattern YAML files found under "
+            f"{PATTERN_ROOT}"
+        )
+
+    for path in pattern_files:
+        registry.load_file(path)
+
+    return KnowledgeEngine(
+        registry=registry,
+        matcher=KnowledgeMatcher(),
+        scorer=KnowledgeScorer(),
+    )
+
+
+def display_result(result) -> None:
+    """Display the result returned by ClinicalPipeline."""
+
+    extraction = result.extraction
+
+    source = get_value(extraction, "source")
 
     print("\n========================================")
-    print("              PATIENT")
+    print("       BLOOD REPORT ANALYSIS")
     print("========================================")
 
-    age = patient.get("age")
-    sex = patient.get("sex")
+    # --------------------------------------------------
+    # INPUT
+    # --------------------------------------------------
 
-    print(
-        "Age:",
-        age if age is not None else "NOT FOUND"
+    print("\nINPUT")
+
+    if source is not None:
+
+        print(
+            "Path:",
+            get_value(source, "path", "unknown"),
+        )
+
+        input_type = get_value(
+            source,
+            "input_type",
+            "unknown",
+        )
+
+        if hasattr(input_type, "value"):
+            input_type = input_type.value
+
+        print("Type:", input_type)
+
+        print(
+            "Pages:",
+            get_value(source, "page_count", 0),
+        )
+
+        print(
+            "OCR pages:",
+            get_value(source, "ocr_pages", 0),
+        )
+
+        ocr_confidence = get_value(
+            source,
+            "ocr_confidence",
+        )
+
+        if ocr_confidence is not None:
+            print(
+                "OCR confidence:",
+                ocr_confidence,
+            )
+
+    # --------------------------------------------------
+    # PATIENT
+    # --------------------------------------------------
+
+    print("\nPATIENT")
+
+    patient = get_value(
+        extraction,
+        "patient",
+    )
+
+    if not patient:
+
+        print(
+            "Patient context: "
+            "NOT SAFELY RESOLVED"
+        )
+
+    else:
+
+        sex = get_value(
+            patient,
+            "sex",
+            "unknown",
+        )
+
+        age = get_value(
+            patient,
+            "age_value",
+        )
+
+        if age is None:
+            age = get_value(
+                patient,
+                "age",
+            )
+
+        age_unit = get_value(
+            patient,
+            "age_unit",
+        )
+
+        if hasattr(sex, "value"):
+            sex = sex.value
+
+        if hasattr(age_unit, "value"):
+            age_unit = age_unit.value
+
+        print("Sex:", sex)
+        print("Age:", age)
+        print("Age unit:", age_unit)
+
+    # --------------------------------------------------
+    # EXTRACTION
+    # --------------------------------------------------
+
+    print("\nEXTRACTION")
+
+    tests = get_value(
+        extraction,
+        "tests",
+        [],
+    )
+
+    lab_results = get_value(
+        result,
+        "lab_results",
+        [],
     )
 
     print(
-        "Sex:",
-        sex if sex else "NOT FOUND"
+        "Tests extracted:",
+        len(tests),
     )
 
+    print(
+        "Canonical LabResults:",
+        len(lab_results),
+    )
 
-# =========================================================
-# DISPLAY TESTS
-# =========================================================
+    validation = get_value(
+        extraction,
+        "validation",
+        {},
+    )
 
-def display_tests(tests: list):
+    validation_status = get_value(
+        validation,
+        "status",
+        "unknown",
+    )
 
-    print("\n========================================")
-    print("         EXTRACTED CBC TESTS")
-    print("========================================")
-
-    if not tests:
-
-        print("No supported CBC tests detected.")
-        return
-
-    for number, test in enumerate(
-        tests,
-        start=1
-    ):
-
-        print(f"\nTest #{number}")
-
-        print(
-            "Name:",
-            test.get("raw_name")
-        )
-
-        print(
-            "Canonical:",
-            test.get("canonical_name")
-        )
-
-        print(
-            "Value:",
-            test.get("value")
-        )
-
-        print(
-            "Unit:",
-            test.get("unit")
-        )
-
-        print(
-            "Reference:",
-            test.get("reference_raw")
-        )
-
-
-# =========================================================
-# DISPLAY VALIDATION
-# =========================================================
-
-def display_validation(validation: dict):
-
-    print("\n========================================")
-    print("         REPORT VALIDATION")
-    print("========================================")
+    can_analyze = get_value(
+        validation,
+        "can_analyze",
+        False,
+    )
 
     print(
-        "Status:",
-        validation["status"]
+        "Validation:",
+        validation_status,
     )
 
     print(
         "Can analyze:",
-        validation["can_analyze"]
+        can_analyze,
+    )
+
+    coverage = get_value(
+        extraction,
+        "coverage",
+        {},
     )
 
     print(
-        "Tests detected:",
-        validation["tests_detected"]
+        "CBC coverage:",
+        get_value(
+            coverage,
+            "status",
+            "unknown",
+        ),
     )
 
-    print(
-        "Valid tests:",
-        validation["valid_tests"]
+    # --------------------------------------------------
+    # UNRESOLVED REFERENCES
+    # --------------------------------------------------
+
+    unresolved = get_value(
+        result,
+        "unresolved_references",
+        [],
     )
 
-    if validation["issues"]:
+    if unresolved:
 
-        print("\nIssues:")
+        print("\nUNRESOLVED REFERENCES")
 
-        for issue in validation["issues"]:
+        for item in unresolved:
 
-            print(
-                "-",
-                issue["message"]
+            test_name = get_value(
+                item,
+                "test_name",
+                "unknown",
             )
 
+            reason = get_value(
+                item,
+                "reason",
+                "Reference interval could not be resolved.",
+            )
 
-# =========================================================
-# DISPLAY PLAUSIBILITY
-# =========================================================
+            print(
+                f"- {test_name}: {reason}"
+            )
 
-def display_plausibility(
-    plausibility: dict
-):
+    # --------------------------------------------------
+    # VALIDATION GATE
+    # --------------------------------------------------
 
-    print("\n========================================")
-    print("       PLAUSIBILITY CHECK")
-    print("========================================")
+    if not can_analyze:
 
-    print(
-        "Tests checked:",
-        plausibility["checked_tests"]
+        print("\n========================================")
+        print("       ANALYSIS BLOCKED")
+        print("========================================")
+
+        reason = get_value(
+            validation,
+            "reason",
+        )
+
+        if reason:
+            print(reason)
+        else:
+            print(
+                "The report could not safely "
+                "be analyzed."
+            )
+
+        return
+
+    # --------------------------------------------------
+    # FINDINGS
+    # --------------------------------------------------
+
+    findings = get_value(
+        result,
+        "findings",
+        [],
     )
 
-    print(
-        "Require verification:",
-        plausibility[
-            "verification_required_count"
-        ]
+    print("\nFINDINGS")
+
+    if not findings:
+
+        print("No findings generated.")
+
+    else:
+
+        for finding in findings:
+
+            status = get_value(
+                finding,
+                "status",
+                "unknown",
+            )
+
+            if hasattr(status, "value"):
+                status = status.value
+
+            print(
+                f"- {get_value(finding, 'test_name', 'unknown')}: "
+                f"{get_value(finding, 'value', 'unknown')} "
+                f"{get_value(finding, 'unit', '')} "
+                f"→ {status}"
+            )
+
+    # --------------------------------------------------
+    # KNOWLEDGE ENGINE
+    # --------------------------------------------------
+
+    matches = get_value(
+        result,
+        "matches",
+        [],
     )
 
-    if not plausibility[
-        "requires_verification"
-    ]:
+    print("\nKNOWLEDGE ENGINE")
+
+    if not matches:
 
         print(
-            "✓ No suspicious extraction values detected."
+            "No knowledge patterns evaluated."
         )
 
         return
 
-    print("\nValues requiring verification:")
+    for match in matches:
 
-    for item in plausibility[
-        "verification_required"
-    ]:
+        pattern = get_value(
+            match,
+            "pattern",
+        )
 
-        print(
-            f"- {item['test']}: "
-            f"{item['value']}"
+        pattern_id = get_value(
+            pattern,
+            "id",
+            "unknown",
+        )
+
+        score = get_value(
+            match,
+            "score",
+            0.0,
+        )
+
+        matched = get_value(
+            match,
+            "matched",
+            False,
         )
 
         print(
-            f"  Reason: {item['reason']}"
+            f"- {pattern_id}: "
+            f"score={score:.1f}, "
+            f"matched={matched}"
         )
 
-
-# =========================================================
-# DISPLAY CBC COVERAGE
-# =========================================================
-
-def display_coverage(
-    coverage: dict
-):
-
-    print("\n========================================")
-    print("          CBC COVERAGE")
-    print("========================================")
-
-    print(
-        "Status:",
-        coverage["status"]
-    )
-
-    print(
-        "Expected supported markers:",
-        coverage["expected_count"]
-    )
-
-    print(
-        "Detected unique markers:",
-        coverage["detected_count"]
-    )
-
-    print(
-        "Missing markers:",
-        coverage["missing_count"]
-    )
-
-    print(
-        "Coverage:",
-        f"{coverage['coverage_percent']}%"
-    )
-
-    # -----------------------------------------------------
-    # Missing
-    # -----------------------------------------------------
-
-    if coverage["missing_markers"]:
-
-        print("\nMissing supported markers:")
-
-        for marker in coverage[
-            "missing_markers"
-        ]:
-
-            print(
-                "-",
-                marker
-            )
-
-    # -----------------------------------------------------
-    # Duplicates
-    # -----------------------------------------------------
-
-    if coverage["duplicate_markers"]:
-
-        print("\nDuplicate markers detected:")
-
-        for marker in coverage[
-            "duplicate_markers"
-        ]:
-
-            print(
-                "-",
-                marker
-            )
-
-    # -----------------------------------------------------
-    # Unknown
-    # -----------------------------------------------------
-
-    if coverage["unknown_markers"]:
-
-        print("\nUnknown markers:")
-
-        for marker in coverage[
-            "unknown_markers"
-        ]:
-
-            print(
-                "-",
-                marker
-            )
-
-    # -----------------------------------------------------
-    # Complete
-    # -----------------------------------------------------
-
-    if (
-        coverage["status"] == "COMPLETE"
-        and not coverage["duplicate_markers"]
-    ):
-
-        print(
-            "\n✓ All currently supported CBC "
-            "markers were detected."
+        evidence = get_value(
+            match,
+            "evidence",
         )
 
+        if evidence:
 
-# =========================================================
-# USER CORRECTIONS
-# =========================================================
+            missing = get_value(
+                evidence,
+                "missing_required",
+                (),
+            )
 
-def request_patient_corrections(
-    validation: dict
-) -> dict:
+            contradictory = get_value(
+                evidence,
+                "contradictory",
+                (),
+            )
 
-    corrections = {}
-
-    questions = validation.get(
-        "user_questions",
-        []
-    )
-
-    if not questions:
-        return corrections
-
-    print("\n========================================")
-    print("       INFORMATION REQUIRED")
-    print("========================================")
-
-    for item in questions:
-
-        field = item["field"]
-        question = item["question"]
-
-        # -------------------------------------------------
-        # AGE
-        # -------------------------------------------------
-
-        if field == "age":
-
-            while True:
-
-                answer = input(
-                    f"\n{question} "
-                ).strip()
-
-                try:
-
-                    age = int(
-                        answer
-                    )
-
-                    if 0 < age <= 120:
-
-                        corrections[
-                            "age"
-                        ] = age
-
-                        break
-
-                    print(
-                        "Please enter an age "
-                        "between 1 and 120."
-                    )
-
-                except ValueError:
-
-                    print(
-                        "Please enter age as a number."
-                    )
-
-        # -------------------------------------------------
-        # SEX
-        # -------------------------------------------------
-
-        elif field == "sex":
-
-            while True:
-
-                answer = input(
-                    f"\n{question} "
-                ).strip().lower()
-
-                aliases = {
-                    "m": "male",
-                    "male": "male",
-                    "f": "female",
-                    "female": "female"
-                }
-
-                if answer in aliases:
-
-                    corrections[
-                        "sex"
-                    ] = aliases[
-                        answer
-                    ]
-
-                    break
+            if missing:
 
                 print(
-                    "Please enter male or female."
+                    "  missing required:",
+                    ", ".join(missing),
                 )
 
-    return corrections
+            if contradictory:
+
+                names = [
+                    get_value(
+                        finding,
+                        "test_name",
+                        "unknown",
+                    )
+                    for finding in contradictory
+                ]
+
+                print(
+                    "  contradictory:",
+                    ", ".join(names),
+                )
 
 
-# =========================================================
-# MAIN PIPELINE
-# =========================================================
+def main() -> int:
+    """Run one report through the complete pipeline."""
 
-def main():
+    report_path = (
+        Path(sys.argv[1])
+        if len(sys.argv) > 1
+        else DEFAULT_REPORT
+    )
 
-    print("\n========================================")
-    print("       BLOOD REPORT PROCESSOR")
-    print("========================================")
+    if not report_path.exists():
+
+        print(
+            f"ERROR: report does not exist: "
+            f"{report_path}"
+        )
+
+        return 1
 
     try:
 
-        # =================================================
-        # STEP 1 — READ PDF
-        # =================================================
+        engine = build_knowledge_engine()
+
+        pipeline = ClinicalPipeline(
+            engine=engine,
+        )
+
+        result = pipeline.run(
+            report_path,
+        )
+
+        display_result(result)
+
+        # A clinically blocked report is still a
+        # successful application execution.
+        #
+        # Therefore:
+        #
+        #   unsafe input -> pipeline blocks it -> 0
+        #
+        # while:
+        #
+        #   application crash -> 1
+
+        return 0
+
+    except Exception as exc:
 
         print(
-            "\n[1/8] Reading PDF..."
+            f"ERROR: {type(exc).__name__}: {exc}"
         )
 
-        raw_text = extract_pdf_text(
-            PDF_PATH
-        )
+        return 1
 
-        print(
-            "✓ PDF text extracted"
-        )
-
-
-        # =================================================
-        # STEP 2 — CLEAN
-        # =================================================
-
-        print(
-            "\n[2/8] Cleaning extracted text..."
-        )
-
-        cleaned_text = clean_pdf_text(
-            raw_text
-        )
-
-        print(
-            "✓ Text cleaned"
-        )
-
-
-        # =================================================
-        # STEP 3 — PATIENT
-        # =================================================
-
-        print(
-            "\n[3/8] Extracting patient context..."
-        )
-
-        patient = extract_patient_context(
-            cleaned_text
-        )
-
-        print(
-            "✓ Patient extraction completed"
-        )
-
-
-        # =================================================
-        # STEP 4 — CBC PARSING
-        # =================================================
-
-        print(
-            "\n[4/8] Extracting CBC tests..."
-        )
-
-        tests = parse_cbc(
-            cleaned_text
-        )
-
-        print(
-            f"✓ {len(tests)} CBC tests detected"
-        )
-
-
-        # =================================================
-        # STEP 5 — COVERAGE
-        # =================================================
-
-        print(
-            "\n[5/8] Checking CBC extraction coverage..."
-        )
-
-        coverage = check_cbc_coverage(
-            tests
-        )
-
-        print(
-            "✓ CBC coverage check completed"
-        )
-
-
-        # =================================================
-        # STEP 6 — STRUCTURAL VALIDATION
-        # =================================================
-
-        print(
-            "\n[6/8] Validating report structure..."
-        )
-
-        validation = validate_report(
-            patient=patient,
-            tests=tests
-        )
-
-        print(
-            "✓ Structural validation completed"
-        )
-
-
-        # =================================================
-        # DISPLAY CURRENT EXTRACTION
-        # =================================================
-
-        display_patient(
-            patient
-        )
-
-        display_tests(
-            tests
-        )
-
-        display_coverage(
-            coverage
-        )
-
-        display_validation(
-            validation
-        )
-
-
-        # =================================================
-        # STEP 7 — PATIENT CORRECTIONS
-        # =================================================
-
-        print(
-            "\n[7/8] Checking whether "
-            "patient corrections are required..."
-        )
-
-        correction_attempts = 0
-
-        max_correction_attempts = 3
-
-        while (
-            validation["status"]
-            == "NEEDS_USER_INPUT"
-            and correction_attempts
-            < max_correction_attempts
-        ):
-
-            correction_attempts += 1
-
-            corrections = (
-                request_patient_corrections(
-                    validation
-                )
-            )
-
-            if not corrections:
-
-                print(
-                    "\nNo corrections were provided."
-                )
-
-                break
-
-            patient = apply_patient_corrections(
-                patient,
-                corrections
-            )
-
-            print(
-                "\nApplying corrections..."
-            )
-
-            validation = validate_report(
-                patient=patient,
-                tests=tests
-            )
-
-            print(
-                "✓ Report revalidated"
-            )
-
-            display_patient(
-                patient
-            )
-
-            display_validation(
-                validation
-            )
-
-
-        # =================================================
-        # STEP 8 — PLAUSIBILITY
-        # =================================================
-
-        plausibility = None
-
-        if validation["can_analyze"]:
-
-            print(
-                "\n[8/8] Running extraction "
-                "plausibility checks..."
-            )
-
-            structurally_valid_tests = (
-                validation.get(
-                    "validated_test_data",
-                    []
-                )
-            )
-
-            plausibility = (
-                check_report_plausibility(
-                    structurally_valid_tests
-                )
-            )
-
-            print(
-                "✓ Plausibility check completed"
-            )
-
-            display_plausibility(
-                plausibility
-            )
-
-        else:
-
-            print(
-                "\n[8/8] Plausibility check skipped."
-            )
-
-            print(
-                "Report has not passed required "
-                "structural validation."
-            )
-
-
-        # =================================================
-        # FINAL DECISION
-        # =================================================
-
-        print("\n========================================")
-        print("          SYSTEM DECISION")
-        print("========================================")
-
-
-        # -------------------------------------------------
-        # STRUCTURAL FAILURE
-        # -------------------------------------------------
-
-        if not validation[
-            "can_analyze"
-        ]:
-
-            print(
-                "✗ Report is not ready for analysis."
-            )
-
-            print(
-                "Required information must be "
-                "resolved first."
-            )
-
-            return
-
-
-        # -------------------------------------------------
-        # PLAUSIBILITY FAILURE
-        # -------------------------------------------------
-
-        if (
-            plausibility
-            and plausibility[
-                "requires_verification"
-            ]
-        ):
-
-            print(
-                "⚠ Report requires verification."
-            )
-
-            print(
-                "One or more extracted values appear "
-                "unusually extreme."
-            )
-
-            print(
-                "Verify them against the original "
-                "report before interpretation."
-            )
-
-            return
-
-
-        # -------------------------------------------------
-        # COVERAGE WARNING
-        # -------------------------------------------------
-
-        if coverage[
-            "status"
-        ] != "COMPLETE":
-
-            print(
-                "⚠ CBC extraction is incomplete."
-            )
-
-            print(
-                f"Detected "
-                f"{coverage['detected_count']} of "
-                f"{coverage['expected_count']} "
-                "currently supported markers."
-            )
-
-            print(
-                "Missing markers should be reviewed "
-                "before treating this extraction as "
-                "a complete CBC."
-            )
-
-            return
-
-
-        # -------------------------------------------------
-        # DUPLICATES
-        # -------------------------------------------------
-
-        if coverage[
-            "duplicate_markers"
-        ]:
-
-            print(
-                "⚠ Duplicate CBC markers were detected."
-            )
-
-            print(
-                "The extraction should be reviewed "
-                "before interpretation."
-            )
-
-            return
-
-
-        # -------------------------------------------------
-        # PARTIAL STRUCTURAL DATA
-        # -------------------------------------------------
-
-        if validation[
-            "status"
-        ] == "PARTIAL":
-
-            print(
-                "⚠ Report contains incomplete "
-                "test data."
-            )
-
-            print(
-                "Incomplete tests will not be used "
-                "for interpretation."
-            )
-
-            return
-
-
-        # -------------------------------------------------
-        # READY
-        # -------------------------------------------------
-
-        print(
-            "✓ Report passed structural validation."
-        )
-
-        print(
-            "✓ CBC extraction coverage is complete "
-            "for the current parser profile."
-        )
-
-        print(
-            "✓ No suspicious extraction values detected."
-        )
-
-        print(
-            "✓ Report is ready for the next stage."
-        )
-
-
-    # =====================================================
-    # ERRORS
-    # =====================================================
-
-    except FileNotFoundError as error:
-
-        print("\n========================================")
-        print("              ERROR")
-        print("========================================")
-
-        print(
-            error
-        )
-
-
-    except ValueError as error:
-
-        print("\n========================================")
-        print("              ERROR")
-        print("========================================")
-
-        print(
-            error
-        )
-
-
-    except Exception as error:
-
-        print("\n========================================")
-        print("         UNEXPECTED ERROR")
-        print("========================================")
-
-        print(
-            f"{type(error).__name__}: {error}"
-        )
-
-
-# =========================================================
-# ENTRY POINT
-# =========================================================
 
 if __name__ == "__main__":
-
-    main()
+    raise SystemExit(main())
