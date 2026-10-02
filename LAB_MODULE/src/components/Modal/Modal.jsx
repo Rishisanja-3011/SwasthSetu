@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import './Modal.css';
 
@@ -21,7 +22,7 @@ export function Modal({ isOpen, onClose, title, children, footer, size = 'md' })
 
   if (!isOpen) return null;
 
-  return (
+  return createPortal(
     <div className="modal-backdrop" onClick={onClose}>
       <div
         className={`modal-container modal-size-${size}`}
@@ -38,6 +39,7 @@ export function Modal({ isOpen, onClose, title, children, footer, size = 'md' })
         <div className="modal-content">{children}</div>
         {footer && <div className="modal-footer">{footer}</div>}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

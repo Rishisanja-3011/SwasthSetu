@@ -31,7 +31,7 @@ function initializeStore() {
     localStorage.setItem(STORAGE_KEYS.VISIT_CONSENTS, JSON.stringify(INITIAL_VISIT_CONSENTS));
   }
   if (!localStorage.getItem(STORAGE_KEYS.CURRENT_LAB_ID)) {
-    localStorage.setItem(STORAGE_KEYS.CURRENT_LAB_ID, 'lab_metro_diag_01');
+    localStorage.setItem(STORAGE_KEYS.CURRENT_LAB_ID, JSON.stringify('lab_metro_diag_01'));
   }
   if (!localStorage.getItem(STORAGE_KEYS.ACCESS_LOGS)) {
     localStorage.setItem(STORAGE_KEYS.ACCESS_LOGS, JSON.stringify([]));
@@ -44,7 +44,12 @@ initializeStore();
 export function getStoreItem(key) {
   try {
     const raw = localStorage.getItem(key);
-    return raw ? JSON.parse(raw) : null;
+    if (!raw) return null;
+    try {
+      return JSON.parse(raw);
+    } catch {
+      return raw;
+    }
   } catch (err) {
     console.error(`Error reading ${key} from storage`, err);
     return null;
