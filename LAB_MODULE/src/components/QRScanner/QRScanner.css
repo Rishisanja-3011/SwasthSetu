@@ -1,0 +1,204 @@
+.qr-scanner-widget {
+  background: #ffffff;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.scanner-tabs {
+  display: flex;
+  background-color: var(--bg-subtle);
+  border-bottom: 1px solid var(--border-light);
+}
+
+.scanner-tab-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.85rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  border-bottom: 2px solid transparent;
+  transition: all var(--transition-fast);
+}
+
+.scanner-tab-btn:hover {
+  color: var(--text-main);
+  background-color: #f8fafc;
+}
+
+.scanner-tab-btn.active {
+  color: var(--primary-600);
+  border-bottom-color: var(--primary-600);
+  background-color: #ffffff;
+}
+
+.scanner-body {
+  padding: 1.5rem;
+}
+
+.scanner-instr {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  margin-bottom: 1.25rem;
+  line-height: 1.5;
+}
+
+.otp-input-group {
+  display: flex;
+  justify-content: center;
+  margin: 1.5rem 0;
+}
+
+.otp-field {
+  width: 240px;
+  font-size: 1.75rem;
+  letter-spacing: 0.35em;
+  text-align: center;
+  padding: 0.6rem 0.5rem;
+  border: 2px solid var(--border-medium);
+  border-radius: var(--radius-md);
+  font-weight: 700;
+  color: var(--primary-700);
+  outline: none;
+  transition: all var(--transition-fast);
+  background-color: #f8fafc;
+}
+
+.otp-field:focus {
+  border-color: var(--primary-600);
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.15);
+  background-color: #ffffff;
+}
+
+.quick-test-badges {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.test-lbl {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.quick-fill-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.25rem 0.6rem;
+  border-radius: var(--radius-sm);
+  background-color: #f1f5f9;
+  color: var(--text-secondary);
+  border: 1px solid var(--border-medium);
+  transition: all var(--transition-fast);
+}
+
+.quick-fill-btn:hover {
+  background-color: #e2e8f0;
+  color: var(--text-main);
+}
+
+.quick-fill-btn.success:hover {
+  background-color: #dcfce7;
+  color: #15803d;
+  border-color: #86efac;
+}
+
+.quick-fill-btn.danger:hover {
+  background-color: #fee2e2;
+  color: #b91c1c;
+  border-color: #fca5a5;
+}
+
+.quick-fill-btn.warn:hover {
+  background-color: #fef3c7;
+  color: #b45309;
+  border-color: #fcd34d;
+}
+
+/* QR Camera viewport simulation */
+.qr-viewport {
+  position: relative;
+  width: 260px;
+  height: 220px;
+  margin: 0 auto 1.25rem;
+  background-color: #0f172a;
+  border-radius: var(--radius-lg);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  color: #ffffff;
+}
+
+.qr-preview-icon {
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.qr-laser-line {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, transparent, #22c55e, transparent);
+  box-shadow: 0 0 10px #22c55e;
+  animation: laserScan 2.5s ease-in-out infinite;
+}
+
+@keyframes laserScan {
+  0% { top: 15%; opacity: 0.4; }
+  50% { top: 75%; opacity: 1; }
+  100% { top: 15%; opacity: 0.4; }
+}
+
+.qr-view-caption {
+  font-size: 0.75rem;
+  color: #94a3b8;
+  margin-top: 0.75rem;
+  text-align: center;
+  padding: 0 1rem;
+}
+
+.scanned-token-box {
+  margin-top: 1rem;
+  padding: 0.6rem 0.85rem;
+  background-color: #f0fdf4;
+  border: 1px solid #86efac;
+  border-radius: var(--radius-md);
+  font-size: 0.8rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.scanner-error-banner {
+  margin-top: 1rem;
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius-md);
+  background-color: #fef2f2;
+  border: 1px solid #fca5a5;
+  color: #b91c1c;
+  font-size: 0.85rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.scanner-action-footer {
+  margin-top: 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.75rem;
+}

@@ -1,0 +1,235 @@
+.lab-report-versions-view {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.versions-breadcrumbs {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.bc-link {
+  color: var(--primary-600);
+  font-weight: 600;
+}
+
+.bc-sep {
+  color: var(--border-dark);
+}
+
+.bc-curr {
+  color: var(--text-secondary);
+}
+
+.success-banner {
+  background-color: #dcfce7;
+  border: 1px solid #86efac;
+  border-radius: var(--radius-md);
+  padding: 0.85rem 1.25rem;
+  color: #15803d;
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  font-weight: 600;
+  font-size: 0.875rem;
+}
+
+.versions-top-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1.25rem;
+}
+
+.ver-title-line {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.versions-heading {
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: var(--text-main);
+}
+
+.ver-current-tag {
+  background-color: #e0e7ff;
+  color: #4338ca;
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 0.2rem 0.6rem;
+  border-radius: var(--radius-full);
+}
+
+.versions-sub {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  margin-top: 0.2rem;
+}
+
+.versions-layout-grid {
+  display: grid;
+  grid-template-columns: 1fr 340px;
+  gap: 1.75rem;
+  align-items: start;
+}
+
+@media (max-width: 960px) {
+  .versions-layout-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.timeline-title-icon {
+  color: var(--primary-600);
+  margin-right: 0.35rem;
+}
+
+.version-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  margin-top: 0.5rem;
+}
+
+.timeline-entry {
+  display: flex;
+  align-items: flex-start;
+  gap: 1.25rem;
+  position: relative;
+}
+
+.timeline-marker {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 24px;
+}
+
+.marker-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background-color: var(--border-medium);
+  border: 2px solid #ffffff;
+  box-shadow: 0 0 0 2px var(--border-medium);
+  z-index: 2;
+}
+
+.entry-current .marker-dot {
+  background-color: var(--primary-600);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.25);
+}
+
+.marker-line {
+  width: 2px;
+  flex: 1;
+  min-height: 70px;
+  background-color: var(--border-light);
+  margin-top: 4px;
+}
+
+.timeline-card {
+  flex: 1;
+  background-color: #ffffff;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+  padding: 1.25rem 1.5rem;
+  box-shadow: var(--shadow-xs);
+}
+
+.entry-current .timeline-card {
+  border-color: var(--primary-300);
+  background-color: #f8fafc;
+}
+
+.timeline-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.65rem;
+}
+
+.version-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.v-num {
+  font-weight: 800;
+  font-size: 0.95rem;
+  color: var(--text-main);
+}
+
+.active-tag {
+  background-color: #dcfce7;
+  color: #15803d;
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 0.15rem 0.45rem;
+  border-radius: var(--radius-sm);
+}
+
+.v-time {
+  font-size: 0.775rem;
+  color: var(--text-muted);
+}
+
+.timeline-author,
+.timeline-notes {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  line-height: 1.45;
+  margin-top: 0.35rem;
+}
+
+.timeline-author strong,
+.timeline-notes strong {
+  color: var(--text-main);
+  margin-right: 0.35rem;
+}
+
+/* Rules sidebar */
+.principles-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1.15rem;
+}
+
+.principle-item {
+  font-size: 0.825rem;
+}
+
+.principle-item strong {
+  display: block;
+  color: var(--text-main);
+  margin-bottom: 0.2rem;
+}
+
+.principle-item p {
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+/* Modal form */
+.correction-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.15rem;
+}
+
+.correction-modal-notice {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}

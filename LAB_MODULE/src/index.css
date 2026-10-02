@@ -1,0 +1,291 @@
+/* ==========================================================================
+   BloodReport Health-Tech Design System & Global Styles
+   Compliant with Master Project Handbook V1 + V1.1
+   ========================================================================== */
+
+:root {
+  /* Brand Clinical Palette */
+  --primary-50: #eff6ff;
+  --primary-100: #dbeafe;
+  --primary-200: #bfdbfe;
+  --primary-300: #93c5fd;
+  --primary-400: #60a5fa;
+  --primary-500: #2563eb;
+  --primary-600: #1d4ed8;
+  --primary-700: #1e40af;
+  --primary-800: #1e3a8a;
+  --primary-900: #172554;
+
+  /* Teal / Healthcare Accents */
+  --teal-50: #f0fdfa;
+  --teal-100: #ccfbf1;
+  --teal-500: #14b8a6;
+  --teal-600: #0d9488;
+  --teal-700: #0f766e;
+
+  /* Neutrals & Surfaces */
+  --bg-page: #f8fafc;
+  --bg-surface: #ffffff;
+  --bg-subtle: #f1f5f9;
+  --bg-muted: #e2e8f0;
+  --border-light: #e2e8f0;
+  --border-medium: #cbd5e1;
+  --border-dark: #94a3b8;
+
+  /* Typography Colors */
+  --text-main: #0f172a;
+  --text-secondary: #475569;
+  --text-muted: #64748b;
+  --text-subtle: #94a3b8;
+  --text-inverse: #ffffff;
+
+  /* Clinical Status Vocabulary Colors */
+  --status-pending-bg: #fef3c7;
+  --status-pending-text: #92400e;
+  --status-pending-border: #fcd34d;
+
+  --status-published-bg: #dcfce7;
+  --status-published-text: #166534;
+  --status-published-border: #86efac;
+
+  --status-corrected-bg: #e0e7ff;
+  --status-corrected-text: #3730a3;
+  --status-corrected-border: #a5b4fc;
+
+  --status-withdrawn-bg: #fee2e2;
+  --status-withdrawn-text: #991b1b;
+  --status-withdrawn-border: #fca5a5;
+
+  --status-approved-bg: #dcfce7;
+  --status-approved-text: #166534;
+  --status-approved-border: #86efac;
+
+  --status-denied-bg: #fee2e2;
+  --status-denied-text: #991b1b;
+  --status-denied-border: #fca5a5;
+
+  --status-expired-bg: #f1f5f9;
+  --status-expired-text: #475569;
+  --status-expired-border: #cbd5e1;
+
+  --status-suspended-bg: #ffe4e6;
+  --status-suspended-text: #be123c;
+  --status-suspended-border: #fda4af;
+
+  /* Finding & Metric Status Indicators (LOW / NORMAL / HIGH) */
+  --metric-low-bg: #eff6ff;
+  --metric-low-text: #1d4ed8;
+  --metric-low-badge: #dbeafe;
+
+  --metric-normal-bg: #f0fdf4;
+  --metric-normal-text: #15803d;
+  --metric-normal-badge: #dcfce7;
+
+  --metric-high-bg: #fef2f2;
+  --metric-high-text: #b91c1c;
+  --metric-high-badge: #fee2e2;
+
+  /* Shadows & Elevation */
+  --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+
+  /* Radii */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
+  --radius-full: 9999px;
+
+  /* Font Families */
+  --font-heading: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  --font-body: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+
+  /* Transitions */
+  --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-normal: 250ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-body);
+  background-color: var(--bg-page);
+  color: var(--text-main);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-heading);
+  font-weight: 700;
+  color: var(--text-main);
+  letter-spacing: -0.02em;
+}
+
+a {
+  color: var(--primary-600);
+  text-decoration: none;
+  transition: color var(--transition-fast);
+}
+
+a:hover {
+  color: var(--primary-700);
+}
+
+button {
+  font-family: var(--font-body);
+  cursor: pointer;
+  border: none;
+  background: none;
+}
+
+input, select, textarea {
+  font-family: var(--font-body);
+}
+
+/* Scrollbar Styling */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Utilities */
+.mono {
+  font-family: var(--font-mono);
+}
+
+.clinical-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.2rem 0.65rem;
+  border-radius: var(--radius-full);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.025em;
+  text-transform: uppercase;
+}
+
+.badge-pending {
+  background: var(--status-pending-bg);
+  color: var(--status-pending-text);
+  border: 1px solid var(--status-pending-border);
+}
+
+.badge-published {
+  background: var(--status-published-bg);
+  color: var(--status-published-text);
+  border: 1px solid var(--status-published-border);
+}
+
+.badge-corrected {
+  background: var(--status-corrected-bg);
+  color: var(--status-corrected-text);
+  border: 1px solid var(--status-corrected-border);
+}
+
+.badge-withdrawn {
+  background: var(--status-withdrawn-bg);
+  color: var(--status-withdrawn-text);
+  border: 1px solid var(--status-withdrawn-border);
+}
+
+.badge-approved {
+  background: var(--status-approved-bg);
+  color: var(--status-approved-text);
+  border: 1px solid var(--status-approved-border);
+}
+
+.badge-denied {
+  background: var(--status-denied-bg);
+  color: var(--status-denied-text);
+  border: 1px solid var(--status-denied-border);
+}
+
+.badge-expired {
+  background: var(--status-expired-bg);
+  color: var(--status-expired-text);
+  border: 1px solid var(--status-expired-border);
+}
+
+.badge-suspended {
+  background: var(--status-suspended-bg);
+  color: var(--status-suspended-text);
+  border: 1px solid var(--status-suspended-border);
+}
+
+/* Metric Observation Tags */
+.metric-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.15rem 0.5rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+.metric-tag.normal {
+  background: var(--metric-normal-badge);
+  color: var(--metric-normal-text);
+}
+.metric-tag.low {
+  background: var(--metric-low-badge);
+  color: var(--metric-low-text);
+}
+.metric-tag.high {
+  background: var(--metric-high-badge);
+  color: var(--metric-high-text);
+}
+
+/* Keyframe Animations */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pulseGlow {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.85; transform: scale(1.02); }
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.25s ease-out forwards;
+}
+
+.spinner {
+  display: inline-block;
+  width: 1.25rem;
+  height: 1.25rem;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  border-top-color: white;
+  animation: spin 0.8s linear infinite;
+}
+
+.spinner-primary {
+  border-color: rgba(37, 99, 235, 0.2);
+  border-top-color: var(--primary-600);
+}
