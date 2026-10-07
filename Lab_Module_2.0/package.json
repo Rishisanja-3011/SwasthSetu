@@ -1,0 +1,19 @@
+{
+  "name": "vaanidoc-2.0-lab-module",
+  "version": "2.0.0",
+  "description": "VaaniDoc 2.0 - Laboratory Intelligence, CBC Verification Engine & Bounded Access Model (MERN)",
+  "scripts": {
+    "server": "cd server && npm start",
+    "client": "cd client && npm run dev",
+    "dev": "cd server && npm start"
+  },
+  "keywords": [
+    "vaanidoc",
+    "cbc",
+    "bounded-access",
+    "mern",
+    "laboratory"
+  ],
+  "author": "VaaniDoc Team",
+  "license": "ISC"
+}

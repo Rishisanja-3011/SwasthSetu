@@ -1,0 +1,709 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+/* ==========================================================================
+   VaaniDoc 2.0 — Laboratory Portal Design System
+   Exact Visual Reference: VaaniDoc Brand Style (Screenshots)
+   Palette: Luminous Off-White Canvas, Crisp White Cards, Emerald-Teal & Cobalt Blue Accents, Deep Navy Headings
+   ========================================================================== */
+
+:root {
+  /* Font Family */
+  --font-main: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+
+  /* Signature VaaniDoc Emerald-Teal (from attached screenshots) */
+  --teal-brand: #00a884;
+  --teal-50: #f0fdfa;
+  --teal-100: #ccfbf1;
+  --teal-200: #99f6e4;
+  --teal-500: #14b8a6;
+  --teal-600: #00a884;
+  --teal-700: #007a60;
+  --teal-800: #0f5143;
+  --teal-mint-bg: #e6f7f4;
+  --teal-mint-border: #b2ece1;
+
+  /* Signature Cobalt / Royal Blue (from "I'm a Doctor" button in screenshot) */
+  --blue-primary: #1d4ed8;
+  --blue-hover: #1e40af;
+  --blue-50: #eff6ff;
+  --blue-100: #dbeafe;
+  --blue-600: #1d4ed8;
+  --blue-700: #1e40af;
+
+  /* Deep Navy Slate (Signature headings from screenshot) */
+  --navy-950: #081a2e;
+  --navy-900: #0a2540;
+  --navy-800: #0f172a;
+  --navy-700: #1e293b;
+  --navy-600: #334155;
+
+  /* Surfaces & Canvas */
+  --bg-page: #f8fafc;
+  --bg-surface: #ffffff;
+  --bg-subtle: #f8fafc;
+  --bg-muted: #f1f5f9;
+
+  --border-light: #e8edf2;
+  --border-medium: #e2e8f0;
+  --border-dark: #cbd5e1;
+
+  /* Typography */
+  --text-main: #0a2540;      /* High-contrast crisp navy heading text */
+  --text-secondary: #334155; /* Neutral dark text */
+  --text-muted: #526071;      /* Clear readable body text from screenshot cards */
+  --text-subtle: #94a3b8;
+  --text-inverse: #ffffff;
+
+  /* Clinical Status Vocabulary */
+  --status-normal-bg: #ecfdf5;
+  --status-normal-text: #059669;
+  --status-normal-border: #a7f3d0;
+
+  --status-low-bg: #eff6ff;
+  --status-low-text: #1d4ed8;
+  --status-low-border: #bfdbfe;
+
+  --status-high-bg: #fff7ed;
+  --status-high-text: #c2410c;
+  --status-high-border: #fed7aa;
+
+  --status-review-bg: #fef2f2;
+  --status-review-text: #b91c1c;
+  --status-review-border: #fecaca;
+
+  --status-active-bg: #e6f7f4;
+  --status-active-text: #007a60;
+  --status-active-border: #b2ece1;
+
+  --status-expired-bg: #f1f5f9;
+  --status-expired-text: #475569;
+  --status-expired-border: #cbd5e1;
+
+  /* Elevation */
+  --shadow-xs: 0 1px 2px 0 rgba(10, 37, 64, 0.04);
+  --shadow-sm: 0 2px 6px -1px rgba(10, 37, 64, 0.04), 0 1px 3px 0 rgba(10, 37, 64, 0.02);
+  --shadow-md: 0 4px 16px -2px rgba(10, 37, 64, 0.05), 0 2px 6px -1px rgba(10, 37, 64, 0.03);
+  --shadow-lg: 0 12px 28px -4px rgba(10, 37, 64, 0.08), 0 4px 12px -2px rgba(10, 37, 64, 0.04);
+  --shadow-card: 0 4px 20px -2px rgba(10, 37, 64, 0.04), 0 2px 6px -1px rgba(10, 37, 64, 0.02);
+
+  /* Radius */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+  --radius-full: 9999px;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-main);
+  background-color: var(--bg-page);
+  background-image: radial-gradient(circle at 88% 10%, rgba(0, 168, 132, 0.08) 0%, rgba(13, 148, 136, 0.03) 30%, transparent 60%);
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+  color: var(--text-main);
+  min-height: 100vh;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ==========================================================================
+   Shell Layout: Top Navbar + (Light Sidebar + Content Canvas)
+   ========================================================================== */
+
+.app-shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+/* Top Navbar */
+.lab-navbar {
+  height: 64px;
+  background-color: var(--bg-surface);
+  border-bottom: 1px solid var(--border-light);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 1.75rem;
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  box-shadow: 0 1px 3px 0 rgba(10, 37, 64, 0.02);
+}
+
+.navbar-brand-group {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+}
+
+.brand-icon-box {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: var(--teal-brand);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  box-shadow: 0 3px 8px rgba(0, 168, 132, 0.28);
+}
+
+.brand-text-block {
+  display: flex;
+  flex-direction: column;
+}
+
+.brand-title {
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: var(--navy-900);
+  line-height: 1.1;
+  letter-spacing: -0.025em;
+}
+
+.brand-subtitle {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--teal-brand);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.navbar-role-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  background-color: var(--teal-mint-bg);
+  border: 1px solid var(--teal-mint-border);
+  color: var(--teal-700);
+  padding: 0.22rem 0.65rem;
+  border-radius: var(--radius-full);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.navbar-right-group {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+}
+
+.lab-identity-badge {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-light);
+  padding: 0.3rem 0.65rem;
+  border-radius: var(--radius-md);
+}
+
+.lab-code-pill {
+  background-color: var(--bg-muted);
+  border: 1px solid var(--border-medium);
+  padding: 0.15rem 0.45rem;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--navy-900);
+}
+
+/* Access State Live Pill */
+.access-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.28rem 0.75rem;
+  border-radius: var(--radius-full);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.access-pill.active {
+  background-color: var(--status-active-bg);
+  border: 1px solid var(--status-active-border);
+  color: var(--status-active-text);
+}
+
+.access-pill.expired {
+  background-color: var(--status-expired-bg);
+  border: 1px solid var(--status-expired-border);
+  color: var(--status-expired-text);
+}
+
+/* Body: Sidebar + Main Content Canvas */
+.shell-body {
+  display: flex;
+  flex: 1;
+}
+
+/* Clean Light Sidebar (Matching VaaniDoc Light Aesthetic) */
+.lab-sidebar {
+  width: 240px;
+  background-color: var(--bg-surface);
+  border-right: 1px solid var(--border-light);
+  color: var(--text-secondary);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 1.25rem 0.75rem;
+  flex-shrink: 0;
+  position: sticky;
+  top: 64px;
+  height: calc(100vh - 64px);
+}
+
+.sidebar-nav-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.sidebar-heading {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--text-subtle);
+  letter-spacing: 0.08em;
+  padding: 0.5rem 0.75rem 0.4rem 0.75rem;
+  text-transform: uppercase;
+}
+
+.sidebar-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.65rem 0.85rem;
+  border-radius: var(--radius-md);
+  color: #475569;
+  font-size: 0.88rem;
+  font-weight: 600;
+  text-decoration: none;
+  background: transparent;
+  border: none;
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.sidebar-nav-item:hover {
+  background-color: var(--bg-muted);
+  color: var(--navy-900);
+}
+
+.sidebar-nav-item.active {
+  background-color: var(--blue-50);
+  color: var(--blue-primary);
+  font-weight: 700;
+}
+
+.sidebar-footer-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  border-top: 1px solid var(--border-light);
+  padding-top: 0.75rem;
+}
+
+/* Main Content Area */
+.main-canvas {
+  flex: 1;
+  padding: 2rem 2.5rem;
+  max-width: 1240px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+/* ==========================================================================
+   Cards, Metrics & UI Components (Image 2 Aesthetic)
+   ========================================================================== */
+
+/* White Clinical Card */
+.clinical-card {
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-lg);
+  padding: 1.75rem;
+  box-shadow: var(--shadow-card);
+  margin-bottom: 1.5rem;
+  transition: box-shadow 0.15s ease;
+}
+
+.clinical-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1.25rem;
+  padding-bottom: 0.85rem;
+  border-bottom: 1px solid var(--border-light);
+}
+
+.card-title-group {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.card-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--navy-900);
+  letter-spacing: -0.01em;
+}
+
+/* Operational Metric Counters Row (Image 2 Card Style) */
+.metrics-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1.25rem;
+  margin-bottom: 1.75rem;
+}
+
+.metric-counter-card {
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-lg);
+  padding: 1.35rem 1.5rem;
+  box-shadow: var(--shadow-card);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  transition: all 0.15s ease;
+}
+
+.metric-counter-card:hover {
+  box-shadow: var(--shadow-md);
+  border-color: var(--border-medium);
+}
+
+.metric-counter-card.alert {
+  border-color: #fca5a5;
+  background-color: #fffafb;
+}
+
+.metric-info .label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.35rem;
+}
+
+.metric-info .value {
+  font-size: 1.85rem;
+  font-weight: 800;
+  color: var(--navy-900);
+  line-height: 1.1;
+  font-family: var(--font-mono);
+  letter-spacing: -0.02em;
+}
+
+/* Metric Icon Boxes (Image 2 style) */
+.metric-icon-box {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.metric-icon-box.teal {
+  background-color: var(--teal-mint-bg);
+  color: var(--teal-brand);
+}
+
+.metric-icon-box.blue {
+  background-color: var(--blue-50);
+  color: var(--blue-primary);
+}
+
+.metric-icon-box.red {
+  background-color: var(--status-review-bg);
+  color: #dc2626;
+}
+
+.metric-icon-box.green {
+  background-color: var(--status-normal-bg);
+  color: #059669;
+}
+
+/* Informational Callouts */
+.info-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.95rem 1.25rem;
+  border-radius: var(--radius-md);
+  margin-bottom: 1.25rem;
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+
+.info-banner.teal {
+  background-color: var(--teal-mint-bg);
+  border: 1px solid var(--teal-mint-border);
+  color: var(--teal-700);
+}
+
+.info-banner.warning {
+  background-color: var(--status-review-bg);
+  border: 1px solid var(--status-review-border);
+  color: var(--status-review-text);
+}
+
+.info-banner.success {
+  background-color: var(--status-normal-bg);
+  border: 1px solid var(--status-normal-border);
+  color: var(--status-normal-text);
+}
+
+.info-banner.neutral {
+  background-color: var(--bg-muted);
+  border: 1px solid var(--border-light);
+  color: var(--text-secondary);
+}
+
+/* Clean Clinical Table */
+.table-wrapper {
+  overflow-x: auto;
+  border: 1px solid var(--border-light);
+  border-radius: 14px;
+  background-color: var(--bg-surface);
+}
+
+.clinical-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.clinical-table th {
+  background-color: var(--bg-subtle);
+  padding: 0.85rem 1.15rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border-light);
+}
+
+.clinical-table td {
+  padding: 0.95rem 1.15rem;
+  font-size: 0.88rem;
+  border-bottom: 1px solid #f1f5f9;
+  color: var(--text-secondary);
+}
+
+.clinical-table tr:last-child td {
+  border-bottom: none;
+}
+
+.clinical-table tr:hover {
+  background-color: #f8fafc;
+}
+
+.clinical-table tr.highlight-review {
+  background-color: #fef8f8;
+}
+
+/* Status Badges */
+.badge-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.22rem 0.6rem;
+  border-radius: var(--radius-full);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.badge-pill.normal {
+  background-color: var(--status-normal-bg);
+  border: 1px solid var(--status-normal-border);
+  color: var(--status-normal-text);
+}
+
+.badge-pill.low {
+  background-color: var(--status-low-bg);
+  border: 1px solid var(--status-low-border);
+  color: var(--status-low-text);
+}
+
+.badge-pill.high {
+  background-color: var(--status-high-bg);
+  border: 1px solid var(--status-high-border);
+  color: var(--status-high-text);
+}
+
+.badge-pill.review {
+  background-color: var(--status-review-bg);
+  border: 1px solid var(--status-review-border);
+  color: var(--status-review-text);
+}
+
+.badge-pill.neutral {
+  background-color: var(--bg-muted);
+  border: 1px solid var(--border-medium);
+  color: var(--text-secondary);
+}
+
+/* Buttons (Matching Screenshot Buttons) */
+.btn-clinical {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  padding: 0.6rem 1.25rem;
+  border-radius: 10px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: all 0.15s ease;
+  font-family: var(--font-main);
+  text-decoration: none;
+}
+
+/* Signature Cobalt Blue ("I'm a Doctor" button in screenshot) */
+.btn-clinical.primary {
+  background-color: var(--blue-primary);
+  color: #ffffff;
+  box-shadow: 0 2px 4px rgba(29, 78, 216, 0.15);
+}
+.btn-clinical.primary:hover:not(:disabled) {
+  background-color: var(--blue-hover);
+  box-shadow: 0 4px 8px rgba(29, 78, 216, 0.25);
+}
+
+/* Signature Emerald Teal */
+.btn-clinical.teal {
+  background-color: var(--teal-brand);
+  color: #ffffff;
+  box-shadow: 0 2px 4px rgba(0, 168, 132, 0.15);
+}
+.btn-clinical.teal:hover:not(:disabled) {
+  background-color: #008f70;
+}
+
+/* Clean White Card Button ("I'm a Patient" button in screenshot) */
+.btn-clinical.outline {
+  background-color: #ffffff;
+  border: 1px solid var(--border-medium);
+  color: var(--navy-900);
+}
+.btn-clinical.outline:hover:not(:disabled) {
+  background-color: #f8fafc;
+  border-color: var(--border-dark);
+}
+
+.btn-clinical:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Simple Modals */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(10, 37, 64, 0.45);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  padding: 1rem;
+}
+
+.modal-dialog {
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-lg);
+  padding: 1.75rem;
+  max-width: 520px;
+  width: 100%;
+  box-shadow: 0 24px 48px -12px rgba(10, 37, 64, 0.18);
+}
+
+.modal-dialog-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1.25rem;
+  padding-bottom: 0.85rem;
+  border-bottom: 1px solid var(--border-light);
+}
+
+/* 4 Identity Fields Card */
+.identity-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.85rem;
+  margin: 1rem 0;
+}
+
+.identity-field-card {
+  background-color: #f8fafc;
+  border: 1px solid var(--border-light);
+  border-radius: 12px;
+  padding: 0.85rem 1.15rem;
+}
+
+.identity-field-card .label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  margin-bottom: 0.25rem;
+  font-weight: 600;
+}
+
+.identity-field-card .val {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--navy-900);
+}
+
+/* Responsive */
+@media (max-width: 900px) {
+  .metrics-row {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .lab-sidebar {
+    width: 200px;
+  }
+}
+
+@media (max-width: 680px) {
+  .shell-body {
+    flex-direction: column;
+  }
+  .lab-sidebar {
+    width: 100%;
+    height: auto;
+    position: static;
+  }
+  .metrics-row {
+    grid-template-columns: 1fr;
+  }
+  .main-canvas {
+    padding: 1rem;
+  }
+}
