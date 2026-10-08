@@ -742,3 +742,212 @@ print("✓ PASSED")
 print("\n========================================")
 print("   ALL PIPELINE INTEGRATION TESTS PASSED")
 print("========================================")
+
+
+# =========================================================
+# CHUNK 3 — VaaniDoc 2.0 VERIFY ENRICHMENT TESTS
+# =========================================================
+
+print("\n========================================")
+print("CHUNK 3 — VERIFY ENRICHMENT (additive tests)")
+print("========================================")
+
+
+# Test C1 — Each test in PipelineResult has plausibility_status
+print("\n----------------------------------------")
+print("TEST C1 — plausibility_status in each test dict")
+print("----------------------------------------")
+
+result_c1, *_ = [None], None
+result_c1 = _run_extraction(FULL_CBC_TEXT)
+cleaned_c1, patient_c1, raw_tests_c1, coverage_c1, validation_c1, plausibility_c1 = result_c1
+
+# Simulate enriched test list (validated_test_data)
+from extraction.pipeline import _merge_plausibility_status
+enriched_c1 = list(validation_c1.get("validated_test_data", []))
+_merge_plausibility_status(enriched_c1, plausibility_c1)
+
+assert len(enriched_c1) == 14
+for t in enriched_c1:
+    assert "plausibility_status" in t, (
+        f"plausibility_status missing from {t.get('canonical_name')}"
+    )
+    assert t["plausibility_status"] in ("PLAUSIBLE", "VERIFY", "NOT_CHECKED"), (
+        f"Unexpected plausibility_status: {t['plausibility_status']}"
+    )
+
+print(f"All 14 tests have plausibility_status")
+print("✓ PASSED")
+
+
+# Test C2 — Each test has status / needs_review / review_reasons
+print("\n----------------------------------------")
+print("TEST C2 — status, needs_review, review_reasons in each test")
+print("----------------------------------------")
+
+from extraction.pipeline import (
+    _enrich_observation_status,
+    _enrich_needs_review,
+)
+
+enriched_c2 = list(validation_c1.get("validated_test_data", []))
+_merge_plausibility_status(enriched_c2, plausibility_c1)
+_enrich_observation_status(enriched_c2)
+_enrich_needs_review(enriched_c2)
+
+for t in enriched_c2:
+    assert "status" in t, f"status missing from {t.get('canonical_name')}"
+    assert t["status"] in ("HIGH", "LOW", "NORMAL", "UNKNOWN"), (
+        f"Invalid status {t['status']!r}"
+    )
+    assert "needs_review" in t
+    assert isinstance(t["needs_review"], bool)
+    assert "review_reasons" in t
+    assert isinstance(t["review_reasons"], list)
+
+print(f"All 14 tests have status/needs_review/review_reasons")
+print("✓ PASSED")
+
+
+# Test C3 — FULL_CBC_TEXT → review_required=False (all reliable data)
+print("\n----------------------------------------")
+print("TEST C3 — FULL_CBC_TEXT → review_required=False")
+print("----------------------------------------")
+
+from extraction.pipeline import _compute_report_review
+
+rr_c3, reasons_c3 = _compute_report_review(
+    enriched_c2, validation_c1, coverage_c1
+)
+# All tests are PLAUSIBLE with parsed references and valid units
+assert rr_c3 is False, (
+    f"Expected review_required=False, got True. "
+    f"Tests with needs_review: {[t['canonical_name'] for t in enriched_c2 if t['needs_review']]}"
+)
+assert reasons_c3 == [], f"Expected no blocking reasons, got: {reasons_c3}"
+
+print(f"review_required={rr_c3}, publish_blocking_reasons={reasons_c3}")
+print("✓ PASSED")
+
+
+# Test C4 — FULL_CBC_TEXT → template_explanation has 14 entries
+print("\n----------------------------------------")
+print("TEST C4 — template_explanation produces 14 entries for FULL_CBC_TEXT")
+print("----------------------------------------")
+
+from extraction.explainer import generate_explanations
+
+explanations_c4 = generate_explanations(enriched_c2)
+assert len(explanations_c4) == 14, (
+    f"Expected 14 explanations, got {len(explanations_c4)}"
+)
+for e in explanations_c4:
+    assert "canonical_name" in e
+    assert "text" in e
+    assert len(e["text"]) > 0
+
+print(f"template_explanation count={len(explanations_c4)}")
+print("✓ PASSED")
+
+
+# Test C5 — PipelineResult has new Chunk 3 fields with correct defaults
+print("\n----------------------------------------")
+print("TEST C5 — PipelineResult new fields present with defaults")
+print("----------------------------------------")
+
+result_c5 = PipelineResult(
+    source=SourceMeta(input_type=InputType.TEXT_PDF),
+    raw_text="",
+    cleaned_text="",
+    patient={},
+    tests=[],
+    coverage={},
+    validation={"status": "UNSAFE_TO_ANALYZE", "can_analyze": False},
+)
+
+assert hasattr(result_c5, "review_required")
+assert result_c5.review_required is False
+assert hasattr(result_c5, "publish_blocking_reasons")
+assert result_c5.publish_blocking_reasons == []
+assert hasattr(result_c5, "template_explanation")
+assert result_c5.template_explanation == []
+
+print("review_required, publish_blocking_reasons, template_explanation defaults OK")
+print("✓ PASSED")
+
+
+# Test C6 — HIGH/LOW result never triggers needs_review by itself
+print("\n----------------------------------------")
+print("TEST C6 — HIGH/LOW result with reliable data → needs_review=False")
+print("----------------------------------------")
+
+from extraction.pipeline import _apply_needs_review
+
+high_test = {
+    "canonical_name": "rdw",
+    "value": 14.3,
+    "unit": "%",
+    "reference_raw": "[11.5-14.0]",
+    "reference_parsed": {"parsed": True, "min": 11.5, "max": 14.0},
+    "plausibility_status": "PLAUSIBLE",
+    "status": "HIGH",
+}
+nr_c6, reasons_c6 = _apply_needs_review(high_test)
+assert nr_c6 is False, "HIGH result with reliable data must NOT trigger needs_review"
+assert reasons_c6 == [], f"Expected no reasons, got: {reasons_c6}"
+
+low_test = {
+    "canonical_name": "hemoglobin",
+    "value": 10.0,
+    "unit": "g/dl",
+    "reference_raw": "[13.0-18.0]",
+    "reference_parsed": {"parsed": True, "min": 13.0, "max": 18.0},
+    "plausibility_status": "PLAUSIBLE",
+    "status": "LOW",
+}
+nr_c6b, reasons_c6b = _apply_needs_review(low_test)
+assert nr_c6b is False, "LOW result with reliable data must NOT trigger needs_review"
+assert reasons_c6b == [], f"Expected no reasons, got: {reasons_c6b}"
+
+print("HIGH+reliable → needs_review=False")
+print("LOW+reliable → needs_review=False")
+print("✓ PASSED")
+
+
+# Test C7 — Empty observation list → review_required=False, explanations=[]
+print("\n----------------------------------------")
+print("TEST C7 — Empty test list → review_required=False, explanations=[]")
+print("----------------------------------------")
+
+rr_c7, reasons_c7 = _compute_report_review(
+    [], {"can_analyze": False, "status": "UNSAFE_TO_ANALYZE"}, {"duplicate_markers": []}
+)
+expl_c7 = generate_explanations([])
+assert expl_c7 == []
+assert any("blocked" in r.lower() for r in reasons_c7)
+
+print(f"reasons={reasons_c7}")
+print("✓ PASSED")
+
+
+# Test C8 — Duplicate CBC markers → publish_blocking_reason added
+print("\n----------------------------------------")
+print("TEST C8 — Duplicate markers → blocking reason in publish_blocking_reasons")
+print("----------------------------------------")
+
+rr_c8, reasons_c8 = _compute_report_review(
+    [{"needs_review": False}],
+    {"can_analyze": True, "status": "VALID"},
+    {"duplicate_markers": ["hemoglobin"]}
+)
+assert any("Duplicate" in r for r in reasons_c8), (
+    f"Expected duplicate marker reason, got: {reasons_c8}"
+)
+print(f"reasons={reasons_c8}")
+print("✓ PASSED")
+
+
+print("\n========================================")
+print("   ALL CHUNK 3 VERIFY TESTS PASSED")
+print("========================================")
+

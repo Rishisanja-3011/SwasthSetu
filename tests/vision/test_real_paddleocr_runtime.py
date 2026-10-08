@@ -32,7 +32,11 @@ from vision.ocr_config import create_ocr_engine
 from vision.ocr_result import OCRResult
 
 
-SAMPLE_IMAGE = Path("samples/reports/image.jpg")
+SAMPLE_IMAGE = (
+    Path("samples/reports/image.png")
+    if Path("samples/reports/image.png").exists()
+    else Path("samples/reports/image.jpg")
+)
 
 
 def test_real_paddleocr_accepts_preprocessed_image():

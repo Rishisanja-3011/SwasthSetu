@@ -639,21 +639,22 @@ print("========================================")
 import os
 import cv2
 
-_PADDLE_CACHE = Path.home() / ".paddleocr"
+_integration_config = OCREngineConfig(lang="en")
+_run_real_integration = os.getenv("RUN_PADDLE_OCR_INTEGRATION") == "1"
 
-_model_cached = _PADDLE_CACHE.exists() and any(
-    _PADDLE_CACHE.rglob("*.pdmodel")
-)
-
-if not _model_cached:
+if not _run_real_integration:
 
     print(
-        "SKIPPED — PaddleOCR model not cached locally."
+        "SKIPPED — real PaddleOCR integration is opt-in."
     )
     print(
-        "Run once with internet access to download "
-        "the model, then re-run this test."
+        "Provision local models, set RUN_PADDLE_OCR_INTEGRATION=1, "
+        "then re-run this test."
     )
+
+elif not _integration_config.models_available():
+
+    print("SKIPPED — configured local PaddleOCR models are unavailable.")
 
 else:
 
@@ -685,7 +686,7 @@ else:
         y += 70
 
     real_engine = PaddleOCREngine(
-        config=OCREngineConfig(lang="en")
+        config=_integration_config
     )
 
     real_result = real_engine.extract(image, page_number=0)

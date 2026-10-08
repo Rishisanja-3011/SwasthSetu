@@ -32,9 +32,9 @@ DESIGN DECISIONS
 
 IMPORTANT
 ---------
-PaddleOCR downloads model weights on first use.
-This requires internet access on the first run only.
-Subsequent runs use the cached model from ~/.paddleocr/.
+Normal application execution requires locally provisioned model weights and
+does not download them. The explicit provisioning utility may opt in to a
+one-time PaddleOCR download into the PaddleX model cache.
 """
 
 from __future__ import annotations
@@ -60,6 +60,10 @@ logger = logging.getLogger(__name__)
 # =========================================================
 
 ENGINE_NAME = "paddleocr"
+
+
+class OCRModelUnavailableError(RuntimeError):
+    """Raised when local OCR model weights have not been provisioned."""
 
 
 # =========================================================
@@ -124,6 +128,17 @@ class PaddleOCREngine(BaseOCREngine):
         if self._model is not None:
             return
 
+        model_dirs_available = self.config.models_available()
+        if not model_dirs_available and not self.config.allow_model_download:
+            detection, recognition = self.config.resolved_model_dirs()
+            raise OCRModelUnavailableError(
+                "PaddleOCR model weights are unavailable for offline execution. "
+                f"Expected detection model at '{detection}' and recognition model at "
+                f"'{recognition}'. Run 'python scripts/provision_paddle_ocr_models.py' "
+                "once with internet access, or set BLOOD_OCR_DETECTION_MODEL_DIR "
+                "and BLOOD_OCR_RECOGNITION_MODEL_DIR to valid local model directories."
+            )
+
         try:
             from paddleocr import PaddleOCR
 
@@ -149,13 +164,25 @@ class PaddleOCREngine(BaseOCREngine):
                 else "cpu"
             )
 
+            model_options = {
+                "lang": self.config.lang,
+                "use_doc_orientation_classify": False,
+                "use_doc_unwarping": False,
+                "use_textline_orientation": False,
+                "device": device,
+            }
+
+            if model_dirs_available:
+                detection, recognition = self.config.resolved_model_dirs()
+                model_options.update(
+                    {
+                        "text_detection_model_dir": str(detection),
+                        "text_recognition_model_dir": str(recognition),
+                    }
+                )
+
             self._model = PaddleOCR(
-                lang=self.config.lang,
-                use_doc_orientation_classify=False,
-                use_doc_unwarping=False,
-                use_textline_orientation=False,
-                device=device,
-                enable_mkldnn=False,
+                **model_options
             )
 
         except Exception as error:
@@ -167,6 +194,10 @@ class PaddleOCREngine(BaseOCREngine):
         logger.info(
             "PaddleOCREngine: model loaded successfully"
         )
+
+    def initialize(self) -> None:
+        """Initialise the configured local model without processing an image."""
+        self._load_model()
 
     # -------------------------------------------------
     # RESULT PARSING

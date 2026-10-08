@@ -26,7 +26,9 @@ The engine must NOT:
 from __future__ import annotations
 
 import logging
+import os
 from abc import ABC, abstractmethod
+from pathlib import Path
 from typing import Optional
 
 import numpy as np
@@ -62,24 +64,79 @@ class OCREngineConfig:
     use_gpu : bool
         Whether to request GPU inference.
         Default False (CPU only).
+    detection_model_dir / recognition_model_dir : str | Path | None
+        Explicit local PaddleOCR model directories. If omitted, the standard
+        PaddleX cache locations for the pinned English PP-OCRv5 models are
+        used when present.
+    model_cache_dir : str | Path | None
+        Root containing PaddleX ``official_models``. Defaults to
+        ``BLOOD_OCR_MODEL_CACHE_DIR`` or ``~/.paddlex/official_models``.
+    allow_model_download : bool
+        Permit PaddleOCR to download missing weights. Defaults to False so
+        normal application execution is deterministic and offline-safe.
     """
 
     def __init__(
         self,
         lang: str = "en",
         confidence_threshold: float = 0.5,
-        use_gpu: bool = False
+        use_gpu: bool = False,
+        detection_model_dir: str | Path | None = None,
+        recognition_model_dir: str | Path | None = None,
+        model_cache_dir: str | Path | None = None,
+        allow_model_download: bool = False,
     ):
         self.lang = lang
         self.confidence_threshold = confidence_threshold
         self.use_gpu = use_gpu
+        self.detection_model_dir = (
+            Path(detection_model_dir)
+            if detection_model_dir is not None
+            else self._environment_path("BLOOD_OCR_DETECTION_MODEL_DIR")
+        )
+        self.recognition_model_dir = (
+            Path(recognition_model_dir)
+            if recognition_model_dir is not None
+            else self._environment_path("BLOOD_OCR_RECOGNITION_MODEL_DIR")
+        )
+        self.model_cache_dir = Path(
+            model_cache_dir
+            or os.getenv("BLOOD_OCR_MODEL_CACHE_DIR")
+            or Path.home() / ".paddlex" / "official_models"
+        )
+        self.allow_model_download = allow_model_download
+
+    @staticmethod
+    def _environment_path(variable_name: str) -> Path | None:
+        value = os.getenv(variable_name)
+        return Path(value) if value else None
+
+    def resolved_model_dirs(self) -> tuple[Path, Path]:
+        """Return configured model directories or the pinned default cache paths."""
+        detection = self.detection_model_dir or (
+            self.model_cache_dir / "PP-OCRv5_server_det"
+        )
+        recognition = self.recognition_model_dir or (
+            self.model_cache_dir / "en_PP-OCRv5_mobile_rec"
+        )
+        return detection, recognition
+
+    def models_available(self) -> bool:
+        """Return True only when both local model directories are usable."""
+        detection, recognition = self.resolved_model_dirs()
+        return all(
+            directory.is_dir() and any(directory.iterdir())
+            for directory in (detection, recognition)
+        )
 
     def __repr__(self) -> str:
         return (
             f"OCREngineConfig("
             f"lang={self.lang!r}, "
             f"confidence_threshold={self.confidence_threshold}, "
-            f"use_gpu={self.use_gpu})"
+            f"use_gpu={self.use_gpu}, "
+            f"model_cache_dir={str(self.model_cache_dir)!r}, "
+            f"allow_model_download={self.allow_model_download})"
         )
 
 
