@@ -1,3 +1,0 @@
-"""
-Knowledge engine tests.
-"""

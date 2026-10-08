@@ -9,4 +9,4 @@ from extraction.vaanidoc_pipeline.coverage import *  # noqa: F401, F403
 from extraction.vaanidoc_pipeline.coverage import (
     check_cbc_coverage,
     SUPPORTED_CBC_MARKERS,
-)
+) 
