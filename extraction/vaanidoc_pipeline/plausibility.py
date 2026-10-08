@@ -1,122 +1,28 @@
 """
-Plausibility checking for extracted CBC values.
+extraction/vaanidoc_pipeline/plausibility.py
+
+Plausibility (sanity-bounds) checking for extracted blood values.
+
+CHANGE FROM ORIGINAL
+--------------------
+Bounds are now loaded from test_registry so all panels
+(CBC, LFT, KFT, Thyroid, Lipid, Diabetes, Hormones, Iron,
+Vitamins, General) are covered.
 
 PURPOSE
 -------
-Detect values that are so unusual that an extraction/parsing
-error should be considered.
+Flag values that are so extreme they are more likely to be
+an extraction or OCR error than a real patient result.
 
 IMPORTANT
 ---------
-This module does NOT:
-
-- diagnose disease
-- determine normal/high/low
-- replace laboratory reference ranges
-- automatically correct values
-- reject unusual results as medically impossible
-
-A flagged value means:
-
-    "Verify this value against the original report."
-
-It does NOT mean:
-
-    "This value is definitely wrong."
+A VERIFY flag means: "check the original report".
+It does NOT mean the value is clinically impossible.
 """
 
+from __future__ import annotations
 
-# =========================================================
-# EXTRACTION SANITY BOUNDS
-# =========================================================
-#
-# These are intentionally BROAD.
-#
-# They are NOT clinical reference ranges.
-#
-# They exist only to catch obvious extraction problems such
-# as:
-#
-#     Hemoglobin = 1590 g/dL
-#     Hematocrit = 490 %
-#     Neutrophils = 710 %
-#
-# Borderline or clinically abnormal results should NOT be
-# flagged here merely for being outside the lab range.
-# =========================================================
-
-PLAUSIBILITY_BOUNDS = {
-
-    "hemoglobin": {
-        "min": 1.0,
-        "max": 30.0
-    },
-
-    "rbc": {
-        "min": 0.1,
-        "max": 15.0
-    },
-
-    "hematocrit": {
-        "min": 1.0,
-        "max": 80.0
-    },
-
-    "mcv": {
-        "min": 30.0,
-        "max": 160.0
-    },
-
-    "mch": {
-        "min": 5.0,
-        "max": 60.0
-    },
-
-    "mchc": {
-        "min": 10.0,
-        "max": 60.0
-    },
-
-    "rdw": {
-        "min": 5.0,
-        "max": 50.0
-    },
-
-    "wbc": {
-        "min": 100.0,
-        "max": 500000.0
-    },
-
-    "neutrophils": {
-        "min": 0.0,
-        "max": 100.0
-    },
-
-    "lymphocytes": {
-        "min": 0.0,
-        "max": 100.0
-    },
-
-    "eosinophils": {
-        "min": 0.0,
-        "max": 100.0
-    },
-
-    "monocytes": {
-        "min": 0.0,
-        "max": 100.0
-    },
-
-    "basophils": {
-        "min": 0.0,
-        "max": 100.0
-    },
-
-    "platelets": {
-        "min": 1000.0,
-        "max": 3000000.0
-    }
-}
+from extraction.vaanidoc_pipeline.test_registry import get_plausibility_bounds
 
 
 # =========================================================
@@ -124,159 +30,66 @@ PLAUSIBILITY_BOUNDS = {
 # =========================================================
 
 def check_test_plausibility(test: dict) -> dict:
-    """
-    Check one structurally valid CBC result.
+    canonical_name = test.get("canonical_name")
+    value          = test.get("value")
 
-    Returns:
+    bounds = get_plausibility_bounds(canonical_name)
 
-        {
-            "status": "PLAUSIBLE"
-        }
-
-    or:
-
-        {
-            "status": "VERIFY",
-            "reason": "...",
-            ...
-        }
-    """
-
-    canonical_name = test.get(
-        "canonical_name"
-    )
-
-    value = test.get(
-        "value"
-    )
-
-    # -----------------------------------------------------
-    # No rule available
-    # -----------------------------------------------------
-
-    bounds = PLAUSIBILITY_BOUNDS.get(
-        canonical_name
-    )
-
+    # No rule for this test
     if bounds is None:
-
         return {
             "status": "NOT_CHECKED",
-            "test": canonical_name,
-            "value": value,
-            "reason": (
-                "No plausibility rule is currently "
-                "configured for this test."
-            )
+            "test":   canonical_name,
+            "value":  value,
+            "reason": "No plausibility rule is currently configured for this test.",
         }
 
-    # -----------------------------------------------------
-    # Value should already have passed Level 2.
-    # Defensive check anyway.
-    # -----------------------------------------------------
-
-    if not isinstance(
-        value,
-        (int, float)
-    ) or isinstance(value, bool):
-
+    # Value must be numeric
+    if not isinstance(value, (int, float)) or isinstance(value, bool):
         return {
             "status": "VERIFY",
-            "test": canonical_name,
-            "value": value,
-            "reason": (
-                "The extracted result is not numeric."
-            )
+            "test":   canonical_name,
+            "value":  value,
+            "reason": "The extracted result is not numeric.",
         }
 
     minimum = bounds["min"]
     maximum = bounds["max"]
 
-    # -----------------------------------------------------
-    # Suspiciously low
-    # -----------------------------------------------------
-
-    if value < minimum:
-
+    if value < minimum or value > maximum:
         return {
-            "status": "VERIFY",
-            "test": canonical_name,
-            "value": value,
+            "status":                  "VERIFY",
+            "test":                    canonical_name,
+            "value":                   value,
             "expected_extraction_min": minimum,
             "expected_extraction_max": maximum,
             "reason": (
-                "The extracted value is outside the "
-                "configured extraction sanity bounds. "
-                "Verify it against the original report."
-            )
+                "The extracted value is outside the configured extraction "
+                "sanity bounds. Verify it against the original report."
+            ),
         }
 
-    # -----------------------------------------------------
-    # Suspiciously high
-    # -----------------------------------------------------
-
-    if value > maximum:
-
-        return {
-            "status": "VERIFY",
-            "test": canonical_name,
-            "value": value,
-            "expected_extraction_min": minimum,
-            "expected_extraction_max": maximum,
-            "reason": (
-                "The extracted value is outside the "
-                "configured extraction sanity bounds. "
-                "Verify it against the original report."
-            )
-        }
-
-    return {
-        "status": "PLAUSIBLE",
-        "test": canonical_name,
-        "value": value
-    }
+    return {"status": "PLAUSIBLE", "test": canonical_name, "value": value}
 
 
 # =========================================================
 # COMPLETE REPORT
 # =========================================================
 
-def check_report_plausibility(
-    tests: list
-) -> dict:
-    """
-    Run plausibility checks over structurally valid tests.
-    """
-
-    results = []
+def check_report_plausibility(tests: list) -> dict:
+    results               = []
     verification_required = []
 
     for test in tests:
-
-        result = check_test_plausibility(
-            test
-        )
-
-        results.append(
-            result
-        )
-
+        result = check_test_plausibility(test)
+        results.append(result)
         if result["status"] == "VERIFY":
-
-            verification_required.append(
-                result
-            )
+            verification_required.append(result)
 
     return {
-        "checked_tests": len(tests),
-        "verification_required_count": len(
-            verification_required
-        ),
-        "requires_verification": (
-            len(verification_required) > 0
-        ),
-        "verification_required": (
-            verification_required
-        ),
-        "results": results
+        "checked_tests":               len(tests),
+        "verification_required_count": len(verification_required),
+        "requires_verification":       len(verification_required) > 0,
+        "verification_required":       verification_required,
+        "results":                     results,
     }

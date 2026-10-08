@@ -103,7 +103,7 @@ def _build_explanation(test: dict) -> str:
     unit_str  = f" {unit}" if unit else ""
 
     if low is not None and high is not None:
-        range_str = f"{low}–{high}{unit_str}"
+        range_str = f"{low}-{high}{unit_str}"
     else:
         range_str = "not available"
 

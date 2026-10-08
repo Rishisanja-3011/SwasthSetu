@@ -1,223 +1,195 @@
 """
-CBC extraction coverage checking.
+extraction/vaanidoc_pipeline/coverage.py
 
-PURPOSE
--------
-This module answers:
+Dynamic CBC / panel coverage checking.
 
-    "How many of the CBC markers that our CURRENT parser
-    is designed to extract were actually extracted?"
+CHANGE FROM ORIGINAL
+--------------------
+The original module hard-coded 14 CBC markers and always
+reported coverage against that fixed set.
 
-This is NOT medical interpretation.
-
-It does NOT:
-- diagnose anything
-- determine whether a CBC is medically sufficient
-- decide whether a missing test should have been ordered
-- assume every laboratory in the future must contain
-  exactly these markers
-
-For the current development scope, our parser supports
-14 CBC markers from the first report.
+This version is DYNAMIC:
+  - It groups detected tests by panel (CBC, LFT, KFT, etc.)
+    using the test_registry.
+  - It reports per-panel coverage so a thyroid report gets a
+    "THYROID" coverage block, not a "CBC" block showing 0/14.
+  - The top-level `status` field is computed across ALL
+    panels that have at least one test detected.
+  - Backward compatibility: the old flat fields
+    (detected_markers, missing_markers, duplicate_markers,
+    unknown_markers, coverage_percent) are still present and
+    describe the PRIMARY panel (the one with most detections).
 """
 
+from __future__ import annotations
 
-# =========================================================
-# CURRENT CBC PROFILE
-# =========================================================
-#
-# These names must correspond to the canonical names
-# produced by parser.py.
-#
-# IMPORTANT:
-# This is our CURRENT parser coverage profile.
-# It is not a universal definition of every CBC panel.
-# =========================================================
+from collections import Counter
+from typing import Dict, List, Set
 
-SUPPORTED_CBC_MARKERS = {
-    "hemoglobin",
-    "rbc",
-    "hematocrit",
-    "mcv",
-    "mch",
-    "mchc",
-    "rdw",
-    "wbc",
-    "neutrophils",
-    "lymphocytes",
-    "eosinophils",
-    "monocytes",
-    "basophils",
-    "platelets"
-}
+from extraction.vaanidoc_pipeline.test_registry import (
+    get_panel,
+    CANONICAL_PANEL,
+)
 
 
 # =========================================================
-# COVERAGE CHECK
+# PANEL DEFINITIONS
+# How many markers are expected per panel (for % coverage).
+# =========================================================
+
+_PANEL_SIZES: Dict[str, int] = {}
+
+for _canon, _panel in CANONICAL_PANEL.items():
+    _PANEL_SIZES[_panel] = _PANEL_SIZES.get(_panel, 0) + 1
+
+
+# =========================================================
+# HELPERS
+# =========================================================
+
+def _panel_status(detected: int, expected: int) -> str:
+    if detected == 0:
+        return "NO_COVERAGE"
+    if detected == expected:
+        return "COMPLETE"
+    return "INCOMPLETE"
+
+
+# =========================================================
+# PUBLIC API
 # =========================================================
 
 def check_cbc_coverage(tests: list) -> dict:
     """
-    Compare extracted CBC markers against the CBC markers
-    currently supported by our parser.
+    Analyse extraction coverage across all detected panels.
 
-    Returns information about:
+    Parameters
+    ----------
+    tests : list[dict]
+        Output of parser.parse_cbc() — each dict must have
+        ``canonical_name``.
 
-    - expected markers
-    - detected markers
-    - missing markers
-    - duplicate markers
-    - unknown markers
-    - coverage percentage
+    Returns
+    -------
+    dict with keys:
+
+    status : str
+        Overall status: "COMPLETE" | "INCOMPLETE" | "NO_COVERAGE"
+
+    panels : dict[str, dict]
+        Per-panel breakdown:
+            detected_count : int
+            expected_count : int
+            coverage_percent : float
+            status : str
+            detected_markers : list[str]
+            missing_markers  : list[str]
+            duplicate_markers: list[str]
+
+    primary_panel : str | None
+        The panel with the most detections.
+
+    # --- Backward-compat flat fields (from primary panel) ---
+    expected_count    : int
+    detected_count    : int
+    missing_count     : int
+    coverage_percent  : float
+    detected_markers  : list[str]
+    missing_markers   : list[str]
+    duplicate_markers : list[str]
+    unknown_markers   : list[str]
     """
 
-    detected_markers = []
-    unknown_markers = []
-
-    # -----------------------------------------------------
     # Collect canonical names
-    # -----------------------------------------------------
+    all_canonical: List[str] = []
+    unknown_markers: List[str] = []
 
     for test in tests:
-
-        canonical_name = test.get(
-            "canonical_name"
-        )
-
-        if not canonical_name:
+        canon = test.get("canonical_name")
+        if not canon:
             continue
-
-        if canonical_name in SUPPORTED_CBC_MARKERS:
-
-            detected_markers.append(
-                canonical_name
-            )
-
+        if get_panel(canon):
+            all_canonical.append(canon)
         else:
+            unknown_markers.append(canon)
 
-            unknown_markers.append(
-                canonical_name
-            )
+    # Count occurrences for duplicate detection
+    counts = Counter(all_canonical)
 
-    # -----------------------------------------------------
-    # Detect duplicates
-    # -----------------------------------------------------
+    # Build per-panel data
+    panel_detected: Dict[str, Set[str]] = {}
+    panel_duplicates: Dict[str, List[str]] = {}
 
-    duplicate_markers = []
+    for canon, count in counts.items():
+        panel = get_panel(canon) or "UNKNOWN"
+        panel_detected.setdefault(panel, set()).add(canon)
+        if count > 1:
+            panel_duplicates.setdefault(panel, []).append(canon)
 
-    seen = set()
+    # Build panel summaries
+    panels: Dict[str, dict] = {}
 
-    for marker in detected_markers:
+    for panel, detected_set in panel_detected.items():
+        expected_count = _PANEL_SIZES.get(panel, len(detected_set))
 
-        if marker in seen:
+        # All canonical names belonging to this panel
+        all_in_panel: Set[str] = {
+            c for c, p in CANONICAL_PANEL.items() if p == panel
+        }
+        missing = sorted(all_in_panel - detected_set)
+        detected_count = len(detected_set)
 
-            if marker not in duplicate_markers:
-                duplicate_markers.append(
-                    marker
-                )
+        panels[panel] = {
+            "detected_count":   detected_count,
+            "expected_count":   expected_count,
+            "coverage_percent": round(detected_count / expected_count * 100, 2)
+                                if expected_count else 0.0,
+            "status":           _panel_status(detected_count, expected_count),
+            "detected_markers": sorted(detected_set),
+            "missing_markers":  missing,
+            "duplicate_markers": sorted(panel_duplicates.get(panel, [])),
+        }
 
-        else:
+    # Primary panel = most detections
+    primary_panel: str | None = None
+    if panels:
+        primary_panel = max(panels, key=lambda p: panels[p]["detected_count"])
 
-            seen.add(
-                marker
-            )
-
-    # -----------------------------------------------------
-    # Unique detected supported markers
-    # -----------------------------------------------------
-
-    unique_detected = set(
-        detected_markers
-    )
-
-    # -----------------------------------------------------
-    # Missing supported markers
-    # -----------------------------------------------------
-
-    missing_markers = (
-        SUPPORTED_CBC_MARKERS
-        - unique_detected
-    )
-
-    # -----------------------------------------------------
-    # Counts
-    # -----------------------------------------------------
-
-    expected_count = len(
-        SUPPORTED_CBC_MARKERS
-    )
-
-    detected_count = len(
-        unique_detected
-    )
-
-    missing_count = len(
-        missing_markers
-    )
-
-    # -----------------------------------------------------
-    # Coverage percentage
-    # -----------------------------------------------------
-
-    if expected_count == 0:
-
-        coverage_percent = 0.0
-
+    # Overall status
+    if not panels:
+        overall_status = "NO_COVERAGE"
+    elif all(v["status"] == "COMPLETE" for v in panels.values()):
+        overall_status = "COMPLETE"
+    elif all(v["status"] == "NO_COVERAGE" for v in panels.values()):
+        overall_status = "NO_COVERAGE"
     else:
+        overall_status = "INCOMPLETE"
 
-        coverage_percent = round(
-            (
-                detected_count
-                / expected_count
-            )
-            * 100,
-            2
-        )
-
-    # -----------------------------------------------------
-    # Coverage status
-    # -----------------------------------------------------
-
-    if detected_count == expected_count:
-
-        status = "COMPLETE"
-
-    elif detected_count == 0:
-
-        status = "NO_COVERAGE"
-
+    # Backward-compat flat fields from primary panel
+    if primary_panel and primary_panel in panels:
+        pp = panels[primary_panel]
+        bc_expected    = pp["expected_count"]
+        bc_detected    = pp["detected_count"]
+        bc_missing     = pp["missing_markers"]
+        bc_detected_mk = pp["detected_markers"]
+        bc_duplicates  = pp["duplicate_markers"]
+        bc_pct         = pp["coverage_percent"]
     else:
-
-        status = "INCOMPLETE"
-
-    # -----------------------------------------------------
-    # Result
-    # -----------------------------------------------------
+        bc_expected = bc_detected = 0
+        bc_missing = bc_detected_mk = bc_duplicates = []
+        bc_pct = 0.0
 
     return {
-        "status": status,
-
-        "expected_count": expected_count,
-
-        "detected_count": detected_count,
-
-        "missing_count": missing_count,
-
-        "coverage_percent": coverage_percent,
-
-        "detected_markers": sorted(
-            unique_detected
-        ),
-
-        "missing_markers": sorted(
-            missing_markers
-        ),
-
-        "duplicate_markers": sorted(
-            duplicate_markers
-        ),
-
-        "unknown_markers": sorted(
-            set(unknown_markers)
-        )
+        "status":           overall_status,
+        "panels":           panels,
+        "primary_panel":    primary_panel,
+        # backward-compat
+        "expected_count":   bc_expected,
+        "detected_count":   bc_detected,
+        "missing_count":    len(bc_missing),
+        "coverage_percent": bc_pct,
+        "detected_markers": bc_detected_mk,
+        "missing_markers":  bc_missing,
+        "duplicate_markers": bc_duplicates,
+        "unknown_markers":  sorted(set(unknown_markers)),
     }
