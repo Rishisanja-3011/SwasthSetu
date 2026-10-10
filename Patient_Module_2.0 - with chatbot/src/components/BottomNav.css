@@ -1,0 +1,68 @@
+.patient-bottom-nav {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  width: 100%;
+  max-width: 100%;
+  height: 68px;
+  background-color: #ffffff;
+  border-top: 1px solid var(--border-subtle);
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  padding: 0 8px;
+  z-index: 99;
+  box-shadow: 0 -4px 16px rgba(10, 37, 64, 0.05);
+}
+
+@media (min-width: 768px) {
+  .patient-bottom-nav {
+    display: none !important;
+  }
+}
+
+.nav-tab-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  color: var(--slate-500);
+  text-decoration: none;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: 10px;
+  transition: all 0.15s ease;
+  position: relative;
+}
+
+.nav-tab-item:hover {
+  color: var(--teal-600);
+}
+
+.nav-tab-item.active {
+  color: var(--teal-600);
+  font-weight: 700;
+}
+
+.nav-tab-item.active::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  width: 20px;
+  height: 3px;
+  background-color: var(--teal-500);
+  border-radius: 0 0 3px 3px;
+}
+
+.nav-tab-icon {
+  width: 20px;
+  height: 20px;
+  transition: transform 0.15s ease;
+}
+
+.nav-tab-item:active .nav-tab-icon {
+  transform: scale(0.9);
+}
