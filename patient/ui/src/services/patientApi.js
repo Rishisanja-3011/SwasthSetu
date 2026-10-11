@@ -201,8 +201,8 @@ export const patientApi = {
   },
 
   /**
-   * Fixed, report-grounded educational explanations. This remains client-side
-   * until the assistant API is added; it never generates a diagnosis or advice.
+   * Fixed, report-grounded educational explanations for the canonical
+   * Assistant page. It never generates a diagnosis or treatment advice.
    */
   async queryAssistant(questionText, contextReport = null) {
     const query = String(questionText || '').toLowerCase().trim();

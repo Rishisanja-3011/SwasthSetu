@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Stethoscope, CheckCircle2, RefreshCw, Building2, MapPin, Award } from 'lucide-react';
 
@@ -8,10 +8,11 @@ export function DoctorConfirmScreen() {
 
   const doctor = location.state?.doctor;
 
-  if (!doctor) {
-    navigate('/');
-    return null;
-  }
+  useEffect(() => {
+    if (!doctor) navigate('/');
+  }, [doctor, navigate]);
+
+  if (!doctor) return null;
 
   const handleConfirm = () => {
     navigate('/visit-type', { state: { doctor } });

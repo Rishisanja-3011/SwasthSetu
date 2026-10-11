@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
   ShieldCheck,
@@ -19,10 +19,11 @@ export function DoctorAccessPermissionScreen() {
 
   const doctor = location.state?.doctor;
 
-  if (!doctor) {
-    navigate('/');
-    return null;
-  }
+  useEffect(() => {
+    if (!doctor) navigate('/');
+  }, [doctor, navigate]);
+
+  if (!doctor) return null;
 
   const handleAllowAccess = () => {
     // Navigate to Intake with REVISITING visitType and explicit doctorAccessGranted

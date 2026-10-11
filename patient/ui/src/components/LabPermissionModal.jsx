@@ -16,8 +16,7 @@ export function LabPermissionModal({ labEntity, isOpen, onClose, onSuccess }) {
         patient,
         laboratory: labEntity,
       });
-      onSuccess(grant);
-      onClose();
+      await onSuccess(grant);
     } catch (err) {
       alert('Failed to grant laboratory access: ' + err.message);
     } finally {

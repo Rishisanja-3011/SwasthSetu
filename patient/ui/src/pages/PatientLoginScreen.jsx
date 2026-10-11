@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Activity, ArrowRight, CheckCircle2, LockKeyhole, Smartphone } from 'lucide-react';
 import { patientApi } from '../services/patientApi';
@@ -29,10 +29,11 @@ export function PatientLoginScreen() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  if (isAuthenticated) {
-    navigate(returnTo, { replace: true });
-    return null;
-  }
+  useEffect(() => {
+    if (isAuthenticated) navigate(returnTo, { replace: true });
+  }, [isAuthenticated, navigate, returnTo]);
+
+  if (isAuthenticated) return null;
 
   const finishAuthentication = (result) => {
     setAuthenticatedSession(result.access_token, result.patient);

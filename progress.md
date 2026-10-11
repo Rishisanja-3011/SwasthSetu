@@ -1,7 +1,7 @@
 # SwasthSetu / VaaniDoc Progress
 
 **Last updated:** 2026-10-11  
-**Stopping point:** Patient authentication and patient UI backend integration were implemented. The Patient Module 2.0 floating MediBot UI has now been integrated into `patient/ui`; the next step is live end-to-end testing and then doctor/laboratory API integration.
+**Stopping point:** Patient authentication and patient UI backend integration are implemented. The Patient 2.0 Assistant and floating MediBot presentation, styles, and avatar asset are now copied into `patient/ui` while canonical patient APIs remain in control. The attached MediBot FastAPI backend is integrated under `patient/backend`; live Atlas patient authentication remains the next verification step.
 
 ## Project rules and decisions
 
@@ -17,7 +17,7 @@
   - An SMS adapter can be added later.
 - Atlas network access decision: use `0.0.0.0/0` for this college-project development environment so changing networks does not require changing the Atlas allowlist.
 - Laboratory grants do not use time-based expiry. They become `EXPIRED` when the associated report is published.
-- No commit has been made.
+- `775dacb` is pushed to `origin/main`. The current patient UI/backend integration changes are local and should be committed only after the focused checks below are reviewed.
 
 ## Completed database foundation
 
@@ -133,21 +133,26 @@ The patient app now contains:
 - Reports, timeline, assistant context, lab permission, encounter creation, intake submission, and waiting-room polling were connected to backend calls.
 - Hardcoded patient fallback data is no longer used for the primary authenticated patient flow.
 
-## Patient Module 2.0 chatbot integration
+## Patient Module 2.0 UI and MediBot integration
 
-The useful chatbot portion from `Patient_Module_2.0 - with chatbot/` has been
-merged into the canonical patient app without copying its old patient context,
-routes, or demo API service.
+The compatible UI/design portion from `Patient_Module_2.0 - with chatbot/` has
+been copied into the canonical patient app without replacing its authenticated
+patient context, routes, or core API service.
 
 Added to `patient/ui`:
 
 - `src/components/FloatingMediBot.jsx`
 - `src/components/FloatingMediBot.css`
 - `src/services/mediBotApi.js`
+- `public/images/medibot-avatar.jpg`
+- `src/pages/AssistantScreen.jsx`
+- `src/pages/AssistantScreen.css`
 - `react-markdown`
 - `remark-gfm`
+- `react-icons`
 
-The floating bot is rendered only after patient authentication. Chat history is
+The floating bot is rendered only after patient authentication and now uses the
+2.0 robot avatar/icon and exact 2.0 floating-chat styling. Chat history remains
 stored under a Patient-ID-specific local-storage key. The API URL is
 configurable with:
 
@@ -155,9 +160,18 @@ configurable with:
 VITE_MEDIBOT_API_URL=http://127.0.0.1:8000/api/v1/chat
 ```
 
-The fallback remains the same URL used by the source module. No `/api/v1/chat`
-route was found in the current `vaanidoc-backend`, so the chatbot UI builds but
-needs its assistant server running before live chat responses work.
+The canonical MediBot backend is now under `patient/backend`. It exposes
+`GET /api/v1/health` and `POST /api/v1/chat`, mounts the previously unmounted
+health router, includes the missing `groq` dependency, and initializes AI
+providers lazily so health checks work without a configured key. The 2.0
+Assistant page keeps the canonical report-grounded `patientApi.queryAssistant`
+workflow while using the 2.0 page design.
+
+The exact source/UI conflict list is documented in:
+
+```text
+Patient_Module_2.0 - with chatbot/PATIENT_UI_INTEGRATION_NOTES.md
+```
 
 `Lab_Module_2.0` was not copied, imported, or added to the canonical build.
 
@@ -194,9 +208,15 @@ After MediBot integration, the `patient/ui` production build passed again.
 Vite reports only a bundle-size warning caused by the Markdown chatbot
 dependency.
 
+The 2.0 visual integration build also passed after adding the `react-icons`
+dependency, Assistant stylesheet, and MediBot avatar asset. The canonical
+MediBot backend passed Python compilation plus FastAPI root, health,
+request-validation, and unconfigured-provider checks using its local
+environment.
+
 ## Important unfinished work
 
-### 1. Perform live authentication testing first
+### 1. Perform live patient authentication testing first
 
 From `lab/server`:
 
@@ -243,7 +263,13 @@ Open `http://localhost:5176` and verify:
 5. Invalid provider codes are rejected.
 6. Reports/timeline show empty authenticated data instead of demo Rahul data.
 
-### 2. Refactor the doctor backend routes
+### 2. Verify MediBot with the teammate's configured provider key
+
+The API contract and local startup/health behavior are verified. A real model
+request still requires the teammate's local provider key and should be tested
+from `patient/backend` without committing `.env`.
+
+### 3. Refactor the doctor backend routes
 
 `lab/server/src/routes/doctorRoutes.js` is still based on the earlier demo schema. It currently expects values such as:
 
@@ -258,7 +284,7 @@ The canonical `Encounter` model now uses:
 
 The doctor queue, cockpit, notes, diagnostic order, and end-consultation routes need to be updated to this canonical model and protected with `requireAuth` plus doctor ownership checks.
 
-### 3. Refactor the laboratory backend routes
+### 4. Refactor the laboratory backend routes
 
 `lab/server/src/routes/labRoutes.js` still contains old demo behavior:
 
@@ -270,14 +296,14 @@ The doctor queue, cockpit, notes, diagnostic order, and end-consultation routes 
 
 It must be updated to use publication-only grant expiry, laboratory role sessions, report ownership, the original PDF flow, and the Python extraction pipeline where appropriate.
 
-### 4. Complete patient workflow integration
+### 5. Complete patient workflow integration
 
 - Replace the revisiting UI permission flag with a server-side encounter permission/relationship decision.
 - Ensure new consultation and revisiting rules are enforced by the backend, not only by React state.
 - Make doctor queue state and patient waiting-room state use the same canonical encounter transitions.
 - Add real QR camera scanning when the chosen frontend dependency is confirmed; manual code entry currently remains available.
 
-### 5. Reconcile the frozen patient manifest
+### 6. Reconcile the frozen patient manifest
 
 `patient/ui/FREEZE_MANIFEST.md` describes the old demo frontend as frozen. The new authentication/API integration intentionally changes that frontend, so the manifest should be updated after the live patient flow is verified.
 

@@ -29,11 +29,6 @@ export function SymptomIntakeScreen() {
   const visitType = location.state?.visitType || 'NEW'; // 'NEW' or 'REVISITING'
   const doctorAccessGranted = location.state?.doctorAccessGranted || false;
 
-  if (!doctor) {
-    navigate('/');
-    return null;
-  }
-
   const [inputMode, setInputMode] = useState('voice'); // 'voice' | 'text'
   const [selectedLang, setSelectedLang] = useState(REGIONAL_LANGUAGES[0]);
   const [isRecording, setIsRecording] = useState(false);
@@ -42,6 +37,10 @@ export function SymptomIntakeScreen() {
   const [textInput, setTextInput] = useState('');
   const [micDenied, setMicDenied] = useState(false);
   const [isStructuring, setIsStructuring] = useState(false);
+
+  useEffect(() => {
+    if (!doctor) navigate('/');
+  }, [doctor, navigate]);
 
   // Timer for recording
   useEffect(() => {
@@ -55,6 +54,8 @@ export function SymptomIntakeScreen() {
     }
     return () => clearInterval(interval);
   }, [isRecording]);
+
+  if (!doctor) return null;
 
   const handleStartVoice = () => {
     setMicDenied(false);

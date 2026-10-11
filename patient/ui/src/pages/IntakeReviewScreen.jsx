@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
   CheckCircle2,
@@ -23,23 +23,25 @@ export function IntakeReviewScreen() {
   const doctorAccessGranted = location.state?.doctorAccessGranted || false;
   const inputMode = location.state?.inputMode || 'voice';
   const rawTranscript = location.state?.rawTranscript || '';
-  const initialStructured = location.state?.structuredData || {
+  const initialStructured = {
     chief_complaint: 'Weakness',
     duration: '3 days',
     symptoms: ['Dizziness'],
     confidence: 0.94,
+    ...(location.state?.structuredData || {}),
   };
-
-  if (!doctor) {
-    navigate('/');
-    return null;
-  }
 
   const [isEditing, setIsEditing] = useState(false);
   const [chiefComplaint, setChiefComplaint] = useState(initialStructured.chief_complaint);
   const [duration, setDuration] = useState(initialStructured.duration);
-  const [symptomsList, setSymptomsList] = useState(initialStructured.symptoms.join(', '));
+  const [symptomsList, setSymptomsList] = useState((Array.isArray(initialStructured.symptoms) ? initialStructured.symptoms : []).join(', '));
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (!doctor) navigate('/');
+  }, [doctor, navigate]);
+
+  if (!doctor) return null;
 
   const handleConfirmAndJoinQueue = async () => {
     setSubmitting(true);

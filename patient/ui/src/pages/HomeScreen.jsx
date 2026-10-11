@@ -73,7 +73,13 @@ export function HomeScreen() {
   };
 
   const handleLabGrantSuccess = (grant) => {
-    setLabGrants(patientApi.getLabGrants());
+    setLabGrants((currentGrants) => {
+      const grantId = String(grant?.id || grant?._id || '');
+      const withoutDuplicate = currentGrants.filter((currentGrant) => (
+        String(currentGrant.id || currentGrant._id || '') !== grantId
+      ));
+      return grant ? [grant, ...withoutDuplicate] : currentGrants;
+    });
     navigate('/reports');
   };
 

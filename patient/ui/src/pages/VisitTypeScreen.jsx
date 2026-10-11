@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { UserPlus, UserCheck, Shield, AlertCircle, ArrowLeft } from 'lucide-react';
 
@@ -8,10 +8,11 @@ export function VisitTypeScreen() {
 
   const doctor = location.state?.doctor;
 
-  if (!doctor) {
-    navigate('/');
-    return null;
-  }
+  useEffect(() => {
+    if (!doctor) navigate('/');
+  }, [doctor, navigate]);
+
+  if (!doctor) return null;
 
   const handleSelectVisitType = (visitType) => {
     if (visitType === 'REVISITING') {

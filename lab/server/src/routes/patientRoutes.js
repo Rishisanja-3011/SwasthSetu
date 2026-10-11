@@ -1,4 +1,5 @@
 const express = require('express');
+const mongoose = require('mongoose');
 
 const {
   Patient,
@@ -27,6 +28,10 @@ async function getAuthenticatedPatient(req) {
 
 function reportIdentifier(report) {
   return `CBC-${String(report._id).slice(-6).toUpperCase()}`;
+}
+
+function isValidObjectId(value) {
+  return mongoose.isValidObjectId(value);
 }
 
 function explanationForObservation(observation) {
@@ -109,6 +114,9 @@ router.get('/reports', async (req, res) => {
 router.get('/reports/:reportId', async (req, res) => {
   try {
     const patient = await getAuthenticatedPatient(req);
+    if (!patient || !isValidObjectId(req.params.reportId)) {
+      return res.status(404).json({ success: false, error: 'PUBLISHED_REPORT_NOT_FOUND' });
+    }
     const report = await DiagnosticReport.findOne({
       _id: req.params.reportId,
       patient_id: patient?._id,
@@ -328,6 +336,9 @@ router.post('/encounters', async (req, res) => {
 router.post('/encounters/:encounterId/intake', async (req, res) => {
   try {
     const patient = await getAuthenticatedPatient(req);
+    if (!patient || !isValidObjectId(req.params.encounterId)) {
+      return res.status(404).json({ success: false, error: 'ENCOUNTER_NOT_FOUND' });
+    }
     const encounter = await Encounter.findOne({
       _id: req.params.encounterId,
       patient_id: patient?._id,
@@ -394,6 +405,9 @@ router.post('/encounters/:encounterId/intake', async (req, res) => {
 router.get('/encounters/:encounterId', async (req, res) => {
   try {
     const patient = await getAuthenticatedPatient(req);
+    if (!patient || !isValidObjectId(req.params.encounterId)) {
+      return res.status(404).json({ success: false, error: 'ENCOUNTER_NOT_FOUND' });
+    }
     const encounter = await Encounter.findOne({
       _id: req.params.encounterId,
       patient_id: patient?._id,

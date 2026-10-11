@@ -22,15 +22,6 @@ export function PatientProvider({ children }) {
         return;
       }
 
-      if (token === 'demo-patient-token') {
-        const stored = patientApi.getStoredPatient();
-        if (stored && !cancelled) {
-          setPatient(stored);
-          setAuthLoading(false);
-          return;
-        }
-      }
-
       try {
         const restoredPatient = await patientApi.getCurrentProfile();
         if (!cancelled) setPatient(restoredPatient);

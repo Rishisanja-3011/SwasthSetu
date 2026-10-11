@@ -34,6 +34,7 @@ async function pendingProviderForChallenge(challengeId) {
   const pending = await PendingProviderVisit.findOne({
     login_attempt_id: String(challengeId),
     status: 'PENDING',
+    expires_at: { $gt: new Date() },
   });
   if (!pending) return null;
 
@@ -43,7 +44,11 @@ async function pendingProviderForChallenge(challengeId) {
 
 async function consumePendingProviderVisit(challengeId) {
   const pending = await PendingProviderVisit.findOneAndUpdate(
-    { login_attempt_id: String(challengeId), status: 'PENDING' },
+    {
+      login_attempt_id: String(challengeId),
+      status: 'PENDING',
+      expires_at: { $gt: new Date() },
+    },
     { status: 'CONSUMED', consumed_at: new Date() },
     { new: true },
   );

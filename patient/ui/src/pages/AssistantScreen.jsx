@@ -1,262 +1,503 @@
-import React, { useState, useEffect } from 'react';
-import {
-  MessageSquareHeart,
-  Send,
-  Sparkles,
-  ShieldAlert,
-  ShieldCheck,
-  Bot,
-  User,
-  AlertCircle,
-  HelpCircle,
-} from 'lucide-react';
+
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import { FaPaperPlane } from 'react-icons/fa';
+
 import { usePatient } from '../context/PatientContext';
 import { patientApi } from '../services/patientApi';
+import './AssistantScreen.css';
 
-const QUICK_PROMPTS = [
-  'What does my Hemoglobin result mean?',
-  'Are my Platelets and WBC count normal?',
-  'Can Dr. Mehta see this report when I revisit?',
-  'What does a LOW or HIGH flag indicate?',
-];
+const MAX_QUESTION_LENGTH = 1000;
+
+/* Load the previous conversation from browser storage. */
+const loadSavedMessages = (storageKey) => {
+  try {
+    const saved = localStorage.getItem(storageKey);
+
+    if (!saved) return [];
+
+    const parsed = JSON.parse(saved);
+
+    if (!Array.isArray(parsed)) return [];
+
+    return parsed.filter(
+      (message) =>
+        message &&
+        (message.role === 'user' || message.role === 'assistant') &&
+        typeof message.content === 'string'
+    );
+  } catch (error) {
+    console.error('Unable to load saved MediBot conversation:', error);
+    return [];
+  }
+};
+
+/* Basic frontend checks for selected diagnosis and prescription requests. */
+const getMedicalSafetyMessage = (question) => {
+  const text = question.toLowerCase().trim();
+
+  const diagnosisPatterns = [
+    /\bdo i have\b/,
+    /\bdiagnose me\b/,
+    /\bwhat disease do i have\b/,
+    /\bwhat condition do i have\b/,
+    /\bconfirm (my )?diagnosis\b/,
+    /\btell me my diagnosis\b/,
+    /\bwhat is my diagnosis\b/,
+    /\bcan you diagnose\b/,
+  ];
+
+  const prescriptionPatterns = [
+    /\bwhich medicine should i take\b/,
+    /\bwhat medicine should i take\b/,
+    /\bwhat medication should i take\b/,
+    /\bprescribe\b/,
+    /\bwhat dosage should i take\b/,
+    /\bhow much medicine should i take\b/,
+    /\bshould i start taking\b/,
+    /\bshould i stop taking\b/,
+    /\bchange my medication\b/,
+    /\bwhich drug should i take\b/,
+  ];
+
+  if (diagnosisPatterns.some((pattern) => pattern.test(text))) {
+    return (
+      'I can explain health conditions and medical information ' +
+      'for educational purposes, but I cannot diagnose you. ' +
+      'Please consult a qualified healthcare professional.'
+    );
+  }
+
+  if (prescriptionPatterns.some((pattern) => pattern.test(text))) {
+    return (
+      'I can provide general educational information about medicines, ' +
+      'but I cannot prescribe medicines or recommend personal doses. ' +
+      'Please consult a qualified healthcare professional for treatment advice.'
+    );
+  }
+
+  return null;
+};
+
+/* Detect explicit food, diet, and meal questions. */
+const isNutritionQuestion = (question) => {
+  const explicitFoodIntent =
+    /\b(food|foods|diet|diets|meal|meals|eat|eating|recipe|recipes|breakfast|lunch|dinner|snack|snacks|vegetarian|vegan|non-vegetarian|nonvegetarian|food plan|meal plan|diet plan|nutrition plan|what should i eat|what to eat|which foods|foods to include|foods to avoid|food sources|sources of vitamin|sources of iron|rich in iron|rich in vitamin)\b/i;
+
+  return explicitFoodIntent.test(question.toLowerCase().trim());
+};
+
+/* Keep the outgoing question within the backend's 1,000-character limit. */
+const prepareQuestionForMediBot = (question) => {
+  if (!isNutritionQuestion(question)) {
+    return question.slice(0, MAX_QUESTION_LENGTH);
+  }
+
+  const instructions =
+    '\n\nUse clear Markdown headings and bullet lists. For nutrition, ' +
+    'include relevant vegetarian and non-vegetarian foods, daily meal ' +
+    'ideas, and nutrient absorption. Separate meals under individual ' +
+    'headings. Avoid tables and pipe characters. Be concise. Do not ' +
+    'assume the cause of low hemoglobin or prescribe medicines.';
+
+  const availableLength =
+    MAX_QUESTION_LENGTH - instructions.length;
+
+  return question.slice(0, availableLength) + instructions;
+};
+
+/* Convert common malformed pipe-separated tables into readable lists. */
+const formatAssistantResponse = (content) => {
+  if (typeof content !== 'string') return '';
+
+  return content
+    .split('\n')
+    .map((line) => {
+      if (!line.includes('|') || !/-{3,}/.test(line)) {
+        return line;
+      }
+
+      const cells = line
+        .split('|')
+        .map((cell) => cell.trim())
+        .filter(Boolean);
+
+      const separatorIndex = cells.findIndex((cell) =>
+        /^:?-{3,}:?$/.test(cell.replace(/\s/g, ''))
+      );
+
+      if (separatorIndex < 1) return line;
+
+      const headers = cells.slice(0, separatorIndex);
+      const dataCells = cells
+        .slice(separatorIndex + 1)
+        .filter((cell) => !/^:?-{3,}:?$/.test(cell));
+
+      if (headers.length < 2 || dataCells.length < headers.length) {
+        return line;
+      }
+
+      const formattedRows = [];
+
+      for (let i = 0; i < dataCells.length; i += headers.length) {
+        const row = dataCells.slice(i, i + headers.length);
+
+        if (row.length !== headers.length) {
+          formattedRows.push(`- ${row.join(' — ')}`);
+          continue;
+        }
+
+        formattedRows.push(
+          `- **${row[0]}:** ${row
+            .slice(1)
+            .map(
+              (value, index) => `${headers[index + 1]}: ${value}`
+            )
+            .join('; ')}`
+        );
+      }
+
+      return `**${headers.join(' / ')}**\n\n${formattedRows.join('\n')}`;
+    })
+    .join('\n');
+};
+
+const createMessageId = () =>
+  `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
 export function AssistantScreen() {
   const { patient } = usePatient();
-  const [messages, setMessages] = useState([]);
-  const [inputText, setInputText] = useState('');
-  const [contextReport, setContextReport] = useState(null);
+  const storageKey = useMemo(
+    () => `vaanidoc-medibot-messages-${patient?.patient_identifier || 'patient'}`,
+    [patient?.patient_identifier],
+  );
+
+  /*
+   * Initialize messages from localStorage.
+   * The previous conversation is restored on page refresh.
+   */
+  const [messages, setMessages] = useState(() => loadSavedMessages(storageKey));
+  const [question, setQuestion] = useState('');
   const [loading, setLoading] = useState(false);
+  const [contextReport, setContextReport] = useState(null);
+
+  const messagesEndRef = useRef(null);
 
   useEffect(() => {
-    // Fetch latest published report to ground answers
-    const init = async () => {
-       const reports = await patientApi.getPublishedReports();
-      if (reports.length > 0) {
-        setContextReport(reports[0]);
-      }
+    let cancelled = false;
+    patientApi.getPublishedReports()
+      .then((reports) => {
+        if (!cancelled) setContextReport(reports[0] || null);
+      })
+      .catch(() => {
+        if (!cancelled) setContextReport(null);
+      });
 
-      setMessages([
-        {
-          id: 'welcome',
-          sender: 'assistant',
-          text: `Namaste ${patient.name.split(' ')[0]}! I am your VaaniDoc Health Assistant. I can explain Complete Blood Count (CBC) terminology, normal reference ranges, and results from your published laboratory reports.`,
-          isSafetyNotice: false,
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        },
-      ]);
+    return () => {
+      cancelled = true;
     };
-    init();
   }, [patient]);
 
-  const handleSendMessage = async (textToSend) => {
-    const query = textToSend || inputText;
-    if (!query.trim()) return;
+  useEffect(() => {
+    setMessages(loadSavedMessages(storageKey));
+  }, [storageKey]);
 
-    const userMsg = {
-      id: `u-${Date.now()}`,
-      sender: 'user',
-      text: query,
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+  /* Save user and assistant messages whenever the conversation changes. */
+  useEffect(() => {
+    try {
+      const messagesToSave = messages.filter(
+        (message) =>
+          message.role === 'user' ||
+          message.role === 'assistant'
+      );
+
+      localStorage.setItem(storageKey, JSON.stringify(messagesToSave));
+    } catch (error) {
+      console.error('Unable to save MediBot conversation:', error);
+    }
+  }, [messages, storageKey]);
+
+  /* Scroll to the latest message. */
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({
+      behavior: 'smooth',
+    });
+  }, [messages, loading]);
+
+  /* Prepare previous conversation history for the API. */
+  const getConversationHistory = () =>
+    messages
+      .filter(
+        (message) =>
+          message.role === 'user' ||
+          message.role === 'assistant'
+      )
+      .map((message) => ({
+        role: message.role,
+        content: message.content,
+      }));
+
+  /* Send the user's question to MediBot. */
+  const handleSend = async () => {
+    if (!question.trim() || loading) return;
+
+    const currentQuestion = question.trim();
+    const safetyMessage = getMedicalSafetyMessage(currentQuestion);
+
+    /* Handle selected safety cases without calling the backend. */
+    if (safetyMessage) {
+      setMessages((previous) => [
+        ...previous,
+        {
+          id: createMessageId(),
+          role: 'user',
+          content: currentQuestion,
+        },
+        {
+          id: createMessageId(),
+          role: 'assistant',
+          content: safetyMessage,
+        },
+      ]);
+
+      setQuestion('');
+      return;
+    }
+
+    const conversationHistory = getConversationHistory();
+
+    const userMessage = {
+      id: createMessageId(),
+      role: 'user',
+      content: currentQuestion,
     };
 
-    setMessages((prev) => [...prev, userMsg]);
-    setInputText('');
+    const thinkingMessage = {
+      id: createMessageId(),
+      role: 'thinking',
+      content: 'MediBot is thinking...',
+    };
+
+    setMessages((previous) => [
+      ...previous,
+      userMessage,
+      thinkingMessage,
+    ]);
+
+    setQuestion('');
     setLoading(true);
 
     try {
-      const res = await patientApi.queryAssistant(query, contextReport);
-      const botMsg = {
-        id: `b-${Date.now()}`,
-        sender: 'assistant',
-        text: res.answer,
-        isSafetyNotice: res.isSafetyNotice,
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      };
-      setMessages((prev) => [...prev, botMsg]);
-    } catch {
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: `b-err-${Date.now()}`,
-          sender: 'assistant',
-          text: 'Unable to reach the assistant right now. Please try again.',
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        },
-      ]);
+      const apiQuestion =
+        prepareQuestionForMediBot(currentQuestion);
+
+      if (apiQuestion.length > MAX_QUESTION_LENGTH) {
+        throw new Error('The question exceeds the API character limit.');
+      }
+
+      const assistantResponse = await patientApi.queryAssistant(apiQuestion, contextReport);
+      const aiMessage = assistantResponse.answer;
+
+      setMessages((previous) =>
+        previous.map((message) =>
+          message.id === thinkingMessage.id
+            ? {
+                id: createMessageId(),
+                role: 'assistant',
+                content: aiMessage,
+              }
+            : message
+        )
+      );
+    } catch (error) {
+      console.error('Error sending message to MediBot:', error);
+
+      setMessages((previous) =>
+        previous.map((message) =>
+          message.id === thinkingMessage.id
+            ? {
+                id: createMessageId(),
+                role: 'assistant',
+                content:
+                  "Sorry, I couldn't process your request right now. Please try again.",
+              }
+            : message
+        )
+      );
     } finally {
       setLoading(false);
     }
   };
 
+  /* Enter sends the message. */
+  const handleKeyDown = (event) => {
+    if (event.key === 'Enter' && !event.shiftKey) {
+      event.preventDefault();
+      handleSend();
+    }
+  };
+
+  /*
+   * New Chat clears the current conversation from both the UI
+   * and localStorage through the messages persistence effect.
+   */
+  const handleNewChat = () => {
+    if (loading) return;
+
+    setMessages([]);
+    setQuestion('');
+  };
+
+  const patientFirstName =
+    patient?.name?.split(' ')[0] || 'there';
+
   return (
-    <div className="fade-in page-reading-container" style={{ maxWidth: 840, padding: '8px 0', display: 'flex', flexDirection: 'column', height: 'calc(100vh - 150px)' }}>
+    <div className="medibot-page">
       {/* Header */}
-      <div style={{ marginBottom: 12 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
-          <h2 style={{ fontSize: '1.35rem', color: 'var(--navy-900)' }}>
-            CBC Health Assistant
-          </h2>
-          <span className="status-pill active" style={{ fontSize: '0.68rem', padding: '2px 7px' }}>
-            Educational Only
-          </span>
-        </div>
-        <p style={{ fontSize: '0.8rem', color: 'var(--slate-500)' }}>
-          Answers grounded strictly in your published CBC laboratory data
-        </p>
-      </div>
+      <header className="medibot-header">
+        <div className="medibot-header-info">
+          <div className="medibot-bot-icon">🩺</div>
 
-      {/* Grounding Status Indicator */}
-      {contextReport && (
-        <div style={{
-          padding: '8px 12px',
-          backgroundColor: 'var(--teal-50)',
-          borderRadius: 8,
-          fontSize: '0.74rem',
-          color: 'var(--teal-900)',
-          display: 'flex',
-          alignItems: 'center',
-          gap: 6,
-          marginBottom: 10,
-          border: '1px solid var(--teal-200)',
-        }}>
-          <Sparkles size={13} color="var(--teal-600)" />
-          <span>Grounded in report: <strong>{contextReport.test_type} ({contextReport.laboratory_name})</strong></span>
+          <div>
+            <h1>MediBot</h1>
+            <div className="medibot-status">
+              <span className="medibot-status-dot"></span>
+              Online
+            </div>
+          </div>
         </div>
-      )}
 
-      {/* Messages Scroll Area */}
-      <div style={{
-        flex: 1,
-        overflowY: 'auto',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 12,
-        padding: '8px 4px',
-        marginBottom: 12,
-      }}>
-        {messages.map((msg) => {
-          const isUser = msg.sender === 'user';
-          return (
-            <div
-              key={msg.id}
-              style={{
-                display: 'flex',
-                gap: 8,
-                alignSelf: isUser ? 'flex-end' : 'flex-start',
-                maxWidth: '88%',
-              }}
-            >
-              {!isUser && (
-                <div style={{
-                  width: 32,
-                  height: 32,
-                  borderRadius: '50%',
-                  backgroundColor: 'var(--teal-100)',
-                  color: 'var(--teal-700)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  flexShrink: 0,
-                  marginTop: 4,
-                }}>
-                  <Bot size={18} />
+        <button
+          type="button"
+          className="medibot-new-chat"
+          onClick={handleNewChat}
+          disabled={loading}
+        >
+          + New Chat
+        </button>
+      </header>
+
+      {/* Chat window */}
+      <div className="medibot-chat-window">
+        {messages.length === 0 ? (
+          <div className="medibot-empty-chat">
+            <div className="medibot-empty-icon">🩺</div>
+
+            <h2>Welcome to MediBot 👋</h2>
+
+            <p className="medibot-empty-description">
+              Namaste {patientFirstName}! I am your medical
+              education assistant for simple, easy-to-understand
+              health information.
+            </p>
+
+            <div className="medibot-suggestion-section">
+              <p className="medibot-suggestion-title">
+                You can ask me about:
+              </p>
+
+              <div className="medibot-suggestion-list">
+                <div className="medibot-suggestion-item">
+                  🩸 <span>Blood tests &amp; reports</span>
                 </div>
-              )}
-
-              <div style={{
-                backgroundColor: isUser ? 'var(--blue-600)' : msg.isSafetyNotice ? '#fff7ed' : '#ffffff',
-                color: isUser ? '#ffffff' : 'var(--slate-800)',
-                border: isUser ? 'none' : msg.isSafetyNotice ? '1px solid #fed7aa' : '1px solid var(--border-subtle)',
-                borderRadius: 14,
-                padding: '12px 14px',
-                fontSize: '0.88rem',
-                lineHeight: 1.5,
-                boxShadow: isUser ? '0 2px 8px rgba(29, 78, 216, 0.2)' : 'var(--shadow-sm)',
-              }}>
-                {msg.isSafetyNotice && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#c2410c', fontWeight: 700, fontSize: '0.78rem', marginBottom: 4 }}>
-                    <ShieldAlert size={14} /> Clinical Safety Notice
-                  </div>
-                )}
-                <div>{msg.text}</div>
-                <div style={{
-                  fontSize: '0.68rem',
-                  color: isUser ? 'rgba(255,255,255,0.7)' : 'var(--slate-400)',
-                  marginTop: 6,
-                  textAlign: 'right',
-                }}>
-                  {msg.timestamp}
+                <div className="medibot-suggestion-item">
+                  💉 <span>Hemoglobin, CBC &amp; blood parameters</span>
+                </div>
+                <div className="medibot-suggestion-item">
+                  🥗 <span>Nutrition &amp; vitamin deficiencies</span>
+                </div>
+                <div className="medibot-suggestion-item">
+                  ❤️ <span>General health &amp; medical education</span>
                 </div>
               </div>
             </div>
-          );
-        })}
 
-        {loading && (
-          <div style={{ display: 'flex', gap: 8, alignSelf: 'flex-start' }}>
-            <div style={{ width: 32, height: 32, borderRadius: '50%', backgroundColor: 'var(--teal-100)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <Bot size={18} color="var(--teal-700)" />
-            </div>
-            <div style={{ backgroundColor: '#ffffff', border: '1px solid var(--border-subtle)', borderRadius: 14, padding: '10px 14px', fontSize: '0.84rem', color: 'var(--slate-500)' }}>
-              Checking laboratory reference standards...
-            </div>
+            <p className="medibot-medical-note">
+              MediBot provides general educational information
+              and is not a replacement for a qualified healthcare
+              professional.
+            </p>
+          </div>
+        ) : (
+          <div className="medibot-messages">
+            {/* Hide the static thinking message; keep the animated one below. */}
+            {messages
+              .filter((message) => message.role !== 'thinking')
+              .map((message) => (
+                <div
+                  key={message.id}
+                  className={`medibot-message ${message.role}`}
+                >
+                  <div className="medibot-message-content">
+                    <ReactMarkdown
+                      remarkPlugins={[remarkGfm]}
+                      components={{
+                        table: ({ children }) => (
+                          <div className="medibot-table-wrapper">
+                            <table className="medibot-response-table">
+                              {children}
+                            </table>
+                          </div>
+                        ),
+                      }}
+                    >
+                      {formatAssistantResponse(message.content)}
+                    </ReactMarkdown>
+                  </div>
+                </div>
+              ))}
+
+            {/* Single animated thinking indicator. */}
+            {loading && (
+              <div className="medibot-message thinking">
+                <div className="medibot-message-content">
+                  <div className="medibot-thinking-indicator">
+                    <span>MediBot is thinking</span>
+                    <span className="medibot-thinking-dots">
+                      <span>.</span>
+                      <span>.</span>
+                      <span>.</span>
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div ref={messagesEndRef} />
           </div>
         )}
       </div>
 
-      {/* Suggested Quick Question Prompts */}
-      <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 8, marginBottom: 8 }}>
-        {QUICK_PROMPTS.map((prompt, idx) => (
-          <button
-            key={idx}
-            type="button"
-            className="btn btn-secondary"
-            onClick={() => handleSendMessage(prompt)}
+      {/* Message input */}
+      <div className="medibot-input-container">
+        <div className="medibot-input-wrapper">
+          <input
+            type="text"
+            placeholder="Ask MediBot anything..."
+            value={question}
+            onChange={(event) => setQuestion(event.target.value)}
+            onKeyDown={handleKeyDown}
             disabled={loading}
-            style={{
-              whiteSpace: 'nowrap',
-              fontSize: '0.74rem',
-              padding: '6px 10px',
-              borderRadius: 20,
-              flexShrink: 0,
-            }}
-          >
-            {prompt}
-          </button>
-        ))}
-      </div>
+          />
 
-      {/* Input Field Form */}
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          handleSendMessage();
-        }}
-        style={{ display: 'flex', gap: 8 }}
-      >
-        <input
-          type="text"
-          placeholder="Ask about CBC markers, reference ranges..."
-          value={inputText}
-          onChange={(e) => setInputText(e.target.value)}
-          disabled={loading}
-          style={{
-            flex: 1,
-            padding: '10px 14px',
-            borderRadius: 12,
-            border: '1px solid var(--border-medium)',
-            fontSize: '0.9rem',
-          }}
-        />
-        <button
-          type="submit"
-          className="btn btn-primary"
-          disabled={loading || !inputText.trim()}
-          style={{ padding: '10px 16px' }}
-        >
-          <Send size={16} />
-        </button>
-      </form>
+          <button
+            type="button"
+            onClick={handleSend}
+            disabled={loading || !question.trim()}
+            title="Send message"
+          >
+            {loading ? '...' : <FaPaperPlane />}
+          </button>
+        </div>
+
+        <p className="medibot-input-note">
+          MediBot provides educational information and does not
+          replace professional medical advice.
+        </p>
+      </div>
     </div>
   );
 }
+
+export default AssistantScreen;
