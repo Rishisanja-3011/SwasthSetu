@@ -164,8 +164,9 @@ The canonical MediBot backend is now under `patient/backend`. It exposes
 `GET /api/v1/health` and `POST /api/v1/chat`, mounts the previously unmounted
 health router, includes the missing `groq` dependency, and initializes AI
 providers lazily so health checks work without a configured key. The 2.0
-Assistant page keeps the canonical report-grounded `patientApi.queryAssistant`
-workflow while using the 2.0 page design.
+Assistant page uses `sendMessageToMediBot()` with conversation history, so it
+receives live answers from `patient/backend` instead of the old fixed
+report-demo helper. The 2.0 page design remains unchanged.
 
 The exact source/UI conflict list is documented in:
 
@@ -212,7 +213,8 @@ The 2.0 visual integration build also passed after adding the `react-icons`
 dependency, Assistant stylesheet, and MediBot avatar asset. The canonical
 MediBot backend passed Python compilation plus FastAPI root, health,
 request-validation, and unconfigured-provider checks using its local
-environment.
+environment. The live Assistant request `What is hemoglobin?` returned HTTP
+`200` with a generated answer from the configured MediBot provider.
 
 ## Important unfinished work
 

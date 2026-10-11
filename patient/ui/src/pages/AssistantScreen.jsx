@@ -5,7 +5,7 @@ import remarkGfm from 'remark-gfm';
 import { FaPaperPlane } from 'react-icons/fa';
 
 import { usePatient } from '../context/PatientContext';
-import { patientApi } from '../services/patientApi';
+import { sendMessageToMediBot } from '../services/mediBotApi';
 import './AssistantScreen.css';
 
 const MAX_QUESTION_LENGTH = 1000;
@@ -180,24 +180,8 @@ export function AssistantScreen() {
   const [messages, setMessages] = useState(() => loadSavedMessages(storageKey));
   const [question, setQuestion] = useState('');
   const [loading, setLoading] = useState(false);
-  const [contextReport, setContextReport] = useState(null);
 
   const messagesEndRef = useRef(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    patientApi.getPublishedReports()
-      .then((reports) => {
-        if (!cancelled) setContextReport(reports[0] || null);
-      })
-      .catch(() => {
-        if (!cancelled) setContextReport(null);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [patient]);
 
   useEffect(() => {
     setMessages(loadSavedMessages(storageKey));
@@ -296,8 +280,10 @@ export function AssistantScreen() {
         throw new Error('The question exceeds the API character limit.');
       }
 
-      const assistantResponse = await patientApi.queryAssistant(apiQuestion, contextReport);
-      const aiMessage = assistantResponse.answer;
+      const aiMessage = await sendMessageToMediBot(
+        apiQuestion,
+        conversationHistory,
+      );
 
       setMessages((previous) =>
         previous.map((message) =>
