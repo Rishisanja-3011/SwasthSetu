@@ -89,7 +89,8 @@ export const ClinicalCockpitScreen = () => {
         encounter: {
           ...prev.encounter,
           status: 'IN_CONSULTATION',
-          lifecycle_state: 'PLEASE_COME_IN',
+           queue_status: updated.queue_status,
+           lifecycle_state: updated.lifecycle_state,
           started_at: updated.started_at,
         },
       }));
@@ -268,7 +269,7 @@ export const ClinicalCockpitScreen = () => {
   const publishedReports = cockpitData?.published_reports || [];
   const currentOrders = cockpitData?.current_orders || [];
 
-  const isConsultationActive = encounter?.status === 'IN_CONSULTATION' || encounter?.lifecycle_state === 'PLEASE_COME_IN';
+  const isConsultationActive = encounter?.queue_status === 'CALLED' || encounter?.queue_status === 'IN_CONSULTATION' || encounter?.lifecycle_state === 'PLEASE_COME_IN';
   const isNewVisit = encounter?.visit_type === 'NEW';
   const isRevisiting = encounter?.visit_type === 'REVISITING';
 

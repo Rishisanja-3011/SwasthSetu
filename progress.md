@@ -271,20 +271,22 @@ The API contract and local startup/health behavior are verified. A real model
 request still requires the teammate's local provider key and should be tested
 from `patient/backend` without committing `.env`.
 
-### 3. Refactor the doctor backend routes
+### 3. Verify the doctor workflow on Windows/Atlas
 
-`lab/server/src/routes/doctorRoutes.js` is still based on the earlier demo schema. It currently expects values such as:
-
-- `status: WAITING`
-- `status: IN_CONSULTATION`
-- `lifecycle_state`
-
-The canonical `Encounter` model now uses:
+The doctor backend route boundary has been migrated to the canonical model:
 
 - `status: OPEN | CLOSED`
 - `queue_status: WAITING | DOCTOR_REVIEWING | IN_CONSULTATION | CALLED`
+- signed `DOCTOR` sessions required for every `/api/doctor/*` route;
+- doctor ownership is enforced for profiles, queues, encounters, and notifications;
+- cockpit, notes, diagnostic orders, closure, and audio-deletion behavior are retained;
+- closed encounters return bounded-access `403` responses.
 
-The doctor queue, cockpit, notes, diagnostic order, and end-consultation routes need to be updated to this canonical model and protected with `requireAuth` plus doctor ownership checks.
+The doctor UI service now uses `/api/auth/provider/login`, signed bearer sessions,
+session restoration, and the canonical queue/cockpit response fields. Demo
+fallback login and simulated queue check-in controls were removed. The doctor
+UI build and backend syntax checks pass; a real doctor registration/login and
+patient-to-doctor queue test still needs to be run from Windows against Atlas.
 
 ### 4. Refactor the laboratory backend routes
 
@@ -311,9 +313,9 @@ It must be updated to use publication-only grant expiry, laboratory role session
 
 ## Recommended resume order tomorrow
 
-1. Run live doctor registration and patient terminal-OTP testing.
-2. Fix any Atlas/API issues found during that test.
-3. Refactor and protect `doctorRoutes.js` against the canonical encounter model.
-4. Connect the doctor UI to the authenticated doctor session.
-5. Refactor and protect laboratory routes.
+1. Run live patient OTP and doctor registration/login/queue testing on Windows.
+2. Fix any Atlas/API issues found during those tests.
+3. Refactor and protect laboratory routes.
+4. Connect the laboratory UI to approved laboratory sessions and publication-only grants.
+5. Integrate original PDF metadata/storage with the Python extraction pipeline.
 6. Test the complete patient → doctor → lab → published report flow.

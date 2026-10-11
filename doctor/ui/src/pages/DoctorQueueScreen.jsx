@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Users, Eye, Sparkles, RefreshCw, PlusCircle, AlertCircle, Clock, ChevronRight, Stethoscope } from 'lucide-react';
 import { useDoctorAuth } from '../context/DoctorAuthContext';
@@ -7,63 +7,13 @@ import { doctorApi } from '../services/doctorApi';
 
 export const DoctorQueueScreen = () => {
   const { doctor, queue, refreshQueue } = useDoctorAuth();
-  const [refreshing, setRefreshing] = useState(false);
-  const [seeding, setSeeding] = useState(false);
+  const [refreshing, setRefreshing] = React.useState(false);
   const navigate = useNavigate();
 
   const handleManualRefresh = async () => {
     setRefreshing(true);
     await refreshQueue();
     setTimeout(() => setRefreshing(false), 300);
-  };
-
-  // Helper to quickly seed/checkin a patient for immediate interactive testing
-  const handleQuickCheckin = async (type = 'NEW') => {
-    setSeeding(true);
-    try {
-      if (type === 'NEW') {
-        await doctorApi.checkinPatient({
-          patient_name: 'Rahul Sharma',
-          patient_identifier: 'PT-2026-4401',
-          age: 32,
-          gender: 'Male',
-          phone: '+91 98765 43210',
-          doctor_code: doctor?.doctor_code || doctor?.qr_code_id || 'DOC-409',
-          visit_type: 'NEW',
-          intake_data: {
-            input_mode: 'voice',
-            raw_transcript: 'Mane tran divas thi khubaj kamjori lage chhe ane chakkar pan aave chhe.',
-            chief_complaint: 'Weakness and recurring dizziness',
-            duration: '3 days',
-            symptoms: ['Weakness', 'Dizziness', 'Mild fatigue'],
-            confidence: 0.96,
-          },
-        });
-      } else {
-        await doctorApi.checkinPatient({
-          patient_name: 'Priya Patel',
-          patient_identifier: 'PT-2026-4402',
-          age: 28,
-          gender: 'Female',
-          phone: '+91 98222 33445',
-          doctor_code: doctor?.doctor_code || doctor?.qr_code_id || 'DOC-409',
-          visit_type: 'REVISITING',
-          intake_data: {
-            input_mode: 'text',
-            raw_transcript: 'Follow-up for previous low hemoglobin treatment. Energy improved slightly.',
-            chief_complaint: 'Follow-up for previous anemia/low Hb',
-            duration: '2 weeks',
-            symptoms: ['Mild fatigue on exertion'],
-            confidence: 0.98,
-          },
-        });
-      }
-      await refreshQueue();
-    } catch (err) {
-      console.error('Checkin error:', err);
-    } finally {
-      setSeeding(false);
-    }
   };
 
   const handleSelectPatient = (encounterId) => {
@@ -112,63 +62,6 @@ export const DoctorQueueScreen = () => {
           >
             <RefreshCw size={15} className={refreshing ? 'spin' : ''} />
             <span>Refresh</span>
-          </button>
-        </div>
-      </div>
-
-      {/* Quick Check-in Demonstration Helpers Bar */}
-      <div style={{
-        backgroundColor: '#ffffff',
-        borderRadius: 12,
-        padding: '12px 18px',
-        border: '1px solid var(--border-subtle)',
-        marginBottom: 20,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        boxShadow: 'var(--shadow-sm)',
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div style={{
-            width: 32,
-            height: 32,
-            borderRadius: 8,
-            backgroundColor: 'var(--teal-50)',
-            color: 'var(--teal-700)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}>
-            <PlusCircle size={18} />
-          </div>
-          <div>
-            <div style={{ fontSize: '0.84rem', fontWeight: 700, color: 'var(--navy-900)' }}>
-              Simulate Live Patient Queue Check-in
-            </div>
-            <div style={{ fontSize: '0.74rem', color: 'var(--slate-500)' }}>
-              Check in test patients directly into Dr. Mehta's queue
-            </div>
-          </div>
-        </div>
-
-        <div style={{ display: 'flex', gap: 10 }}>
-          <button
-            onClick={() => handleQuickCheckin('NEW')}
-            className="btn-secondary"
-            style={{ padding: '6px 14px', fontSize: '0.8rem' }}
-            disabled={seeding}
-          >
-            <Sparkles size={14} color="var(--blue-600)" />
-            <span>Check in Rahul (NEW)</span>
-          </button>
-          <button
-            onClick={() => handleQuickCheckin('REVISITING')}
-            className="btn-secondary"
-            style={{ padding: '6px 14px', fontSize: '0.8rem' }}
-            disabled={seeding}
-          >
-            <Clock size={14} color="var(--teal-600)" />
-            <span>Check in Priya (REVISITING)</span>
           </button>
         </div>
       </div>
@@ -336,16 +229,6 @@ export const DoctorQueueScreen = () => {
             <p style={{ fontSize: '0.86rem', color: 'var(--slate-500)', maxWidth: 420, margin: '0 auto 18px auto' }}>
               Your queue is clear. When patients scan your doctor QR standee ({doctor?.doctor_code || 'DOC-409'}) and check in, they will appear here automatically.
             </p>
-            <div style={{ display: 'flex', justifyContent: 'center', gap: 12 }}>
-              <button
-                onClick={() => handleQuickCheckin('NEW')}
-                className="btn-primary"
-                style={{ fontSize: '0.84rem' }}
-                disabled={seeding}
-              >
-                <span>Check in Test Patient (Rahul)</span>
-              </button>
-            </div>
           </div>
         )}
       </div>

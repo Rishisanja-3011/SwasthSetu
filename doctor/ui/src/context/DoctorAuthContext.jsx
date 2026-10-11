@@ -5,11 +5,33 @@ const DoctorAuthContext = createContext(null);
 
 export const DoctorAuthProvider = ({ children }) => {
   const [doctor, setDoctor] = useState(() => doctorApi.getActiveDoctor());
+  const [authLoading, setAuthLoading] = useState(Boolean(doctorApi.getAccessToken()));
   const [queue, setQueue] = useState([]);
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function restoreSession() {
+      if (!doctorApi.getAccessToken()) {
+        setAuthLoading(false);
+        return;
+      }
+      try {
+        const restoredDoctor = await doctorApi.getCurrentProfile();
+        if (!cancelled) setDoctor(restoredDoctor);
+      } catch (restoreError) {
+        doctorApi.clearActiveDoctor();
+        if (!cancelled) setDoctor(null);
+      } finally {
+        if (!cancelled) setAuthLoading(false);
+      }
+    }
+    restoreSession();
+    return () => { cancelled = true; };
+  }, []);
 
   const refreshQueue = useCallback(async () => {
     if (!doctor || (!doctor._id && !doctor.id)) return;
@@ -115,7 +137,8 @@ export const DoctorAuthProvider = ({ children }) => {
         login,
         register,
         logout,
-        loading,
+         loading,
+         authLoading,
         error,
       }}
     >

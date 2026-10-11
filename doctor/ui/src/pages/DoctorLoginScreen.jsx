@@ -5,14 +5,14 @@ import { useDoctorAuth } from '../context/DoctorAuthContext';
 
 export const DoctorLoginScreen = () => {
   const [activeTab, setActiveTab] = useState('login'); // 'login' | 'register'
-  const [doctorCode, setDoctorCode] = useState('DOC-409');
-  const [phone, setPhone] = useState('+91 98111 22334');
+  const [doctorCode, setDoctorCode] = useState('');
+  const [phone, setPhone] = useState('');
 
   // Registration state
-  const [name, setName] = useState('Dr. Ramesh Mehta');
-  const [regPhone, setRegPhone] = useState('+91 98111 22334');
-  const [specialty, setSpecialty] = useState('General Physician & Family Medicine');
-  const [clinicName, setClinicName] = useState('Mehta Community Health Clinic');
+  const [name, setName] = useState('');
+  const [regPhone, setRegPhone] = useState('');
+  const [specialty, setSpecialty] = useState('General Physician');
+  const [clinicName, setClinicName] = useState('');
 
   const { login, register, loading, error } = useDoctorAuth();
   const navigate = useNavigate();
@@ -36,15 +36,6 @@ export const DoctorLoginScreen = () => {
         specialty,
         clinic_name: clinicName,
       });
-      navigate('/');
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
-  const handleQuickDemo = async () => {
-    try {
-      await login({ doctor_code: 'DOC-409' });
       navigate('/');
     } catch (err) {
       console.error(err);
@@ -91,37 +82,6 @@ export const DoctorLoginScreen = () => {
           <p style={{ fontSize: '0.86rem', color: 'var(--slate-500)', marginTop: 4 }}>
             Doctor-Specific Queue • Dual Clinical Intake • Bounded Access
           </p>
-        </div>
-
-        {/* Quick Demo Pill Button */}
-        <div style={{
-          backgroundColor: '#eff6ff',
-          borderRadius: 12,
-          padding: '12px 16px',
-          border: '1px solid #bfdbfe',
-          marginBottom: 24,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-        }}>
-          <div>
-            <div style={{ fontSize: '0.84rem', fontWeight: 700, color: '#1e40af' }}>
-              Quick Evaluation Doctor
-            </div>
-            <div style={{ fontSize: '0.76rem', color: '#3b82f6' }}>
-              Dr. Ramesh Mehta (DOC-409)
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={handleQuickDemo}
-            className="btn-primary"
-            style={{ padding: '6px 14px', fontSize: '0.82rem' }}
-            disabled={loading}
-          >
-            <span>Enter Cabin</span>
-            <ArrowRight size={14} />
-          </button>
         </div>
 
         {/* Tab Toggle */}

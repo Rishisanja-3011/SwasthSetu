@@ -9,7 +9,11 @@ import { DoctorQRScreen } from './pages/DoctorQRScreen';
 
 // Full-Width Clean Clinical Layout Shell (No Sidebar)
 const DoctorLayout = ({ children }) => {
-  const { doctor } = useDoctorAuth();
+  const { doctor, authLoading } = useDoctorAuth();
+
+  if (authLoading) {
+    return <div style={{ padding: 60, textAlign: 'center', color: 'var(--slate-500)' }}>Restoring secure doctor session...</div>;
+  }
 
   if (!doctor) {
     return <Navigate to="/login" replace />;

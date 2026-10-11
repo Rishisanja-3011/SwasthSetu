@@ -5,7 +5,7 @@ import { useDoctorAuth } from '../context/DoctorAuthContext';
 
 export const DoctorSidebar = () => {
   const { doctor, queue } = useDoctorAuth();
-  const waitingCount = queue.filter(q => q.status === 'WAITING' || q.status === 'IN_CONSULTATION').length;
+  const waitingCount = queue.filter(q => q.status === 'OPEN').length;
 
   return (
     <aside style={{
