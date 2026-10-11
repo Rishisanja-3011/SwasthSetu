@@ -30,7 +30,7 @@ export function AssistantScreen() {
   useEffect(() => {
     // Fetch latest published report to ground answers
     const init = async () => {
-      const reports = await patientApi.getPublishedReports(patient.id);
+       const reports = await patientApi.getPublishedReports();
       if (reports.length > 0) {
         setContextReport(reports[0]);
       }

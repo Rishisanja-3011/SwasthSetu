@@ -19,14 +19,7 @@ const consultationNoteSchema = new mongoose.Schema({
   notes_text: {
     type: String,
     required: true,
-  },
-  diagnosis: {
-    type: String,
-    default: '',
-  },
-  prescription: {
-    type: String,
-    default: '',
+    trim: true,
   },
   created_at: {
     type: Date,

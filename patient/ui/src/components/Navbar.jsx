@@ -6,7 +6,7 @@ import { PatientSwitcherModal } from './PatientSwitcherModal';
 import './Navbar.css';
 
 export function Navbar() {
-  const { patient, isOnline } = usePatient();
+  const { patient } = usePatient();
   const [showSwitcher, setShowSwitcher] = useState(false);
 
   return (

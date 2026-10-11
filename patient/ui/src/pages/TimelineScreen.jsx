@@ -18,8 +18,7 @@ export function TimelineScreen() {
   const [events, setEvents] = useState([]);
 
   useEffect(() => {
-    const list = patientApi.getHealthTimeline(patient.id);
-    setEvents(list);
+    patientApi.getHealthTimeline().then(setEvents).catch(() => setEvents([]));
   }, [patient]);
 
   const getEventIcon = (type) => {

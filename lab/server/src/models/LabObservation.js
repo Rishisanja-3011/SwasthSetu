@@ -20,7 +20,7 @@ const labObservationSchema = new mongoose.Schema({
   },
   unit: {
     type: String,
-    required: true,
+    default: null,
   },
   reference_low: {
     type: Number,
@@ -33,7 +33,7 @@ const labObservationSchema = new mongoose.Schema({
   flag: {
     type: String,
     enum: ['HIGH', 'LOW', 'NORMAL'],
-    required: true,
+    default: null,
   },
   extraction_confidence: {
     type: Number,

@@ -13,10 +13,10 @@ const symptomIntakeSchema = new mongoose.Schema({
   },
   input_mode: {
     type: String,
-    enum: ['voice', 'text', 'skipped'],
-    default: 'voice',
+    enum: ['VOICE', 'TEXT', 'SKIPPED'],
+    required: true,
   },
-  raw_transcript: {
+  transcript: {
     type: String,
     default: '',
   },
@@ -38,6 +38,19 @@ const symptomIntakeSchema = new mongoose.Schema({
   confidence: {
     type: Number,
     default: 0.95,
+    min: 0,
+    max: 1,
+  },
+  provenance: {
+    type: mongoose.Schema.Types.Mixed,
+    default: {
+      transcript: 'PATIENT_REPORTED',
+      structured_data: 'AI_GENERATED',
+    },
+  },
+  confirmed_at: {
+    type: Date,
+    default: null,
   },
   audio_deleted: {
     type: Boolean,

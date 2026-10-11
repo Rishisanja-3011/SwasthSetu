@@ -30,7 +30,7 @@ export function ReportsScreen() {
   const loadReports = async () => {
     setLoading(true);
     try {
-      const data = await patientApi.getPublishedReports(patient.id);
+      const data = await patientApi.getPublishedReports();
       setReports(data);
     } catch (err) {
       console.warn('Failed loading reports:', err);

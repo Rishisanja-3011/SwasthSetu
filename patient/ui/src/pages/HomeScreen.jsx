@@ -22,7 +22,7 @@ import { StatusBadge } from '../components/StatusBadge';
 
 export function HomeScreen() {
   const navigate = useNavigate();
-  const { patient, activeEncounter } = usePatient();
+  const { patient } = usePatient();
 
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [selectedLabEntity, setSelectedLabEntity] = useState(null);
@@ -40,7 +40,7 @@ export function HomeScreen() {
     setLoading(true);
     try {
       const [reps, grants] = await Promise.all([
-        patientApi.getPublishedReports(patient.id),
+        patientApi.getPublishedReports(),
         patientApi.getLabGrants(),
       ]);
       setReports(reps.slice(0, 3));

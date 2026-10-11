@@ -15,6 +15,11 @@ env/
 .vscode/
 .idea/
 
+# Local secrets
+
+.env
+**/.env
+
 # Pytest
 
 .pytest_cache/

@@ -24,6 +24,7 @@ const diagnosticReportSchema = new mongoose.Schema({
     type: String,
     enum: ['UPLOADED', 'PROCESSING', 'NEEDS_REVIEW', 'PUBLISHED'],
     default: 'PROCESSING',
+    index: true,
   },
   original_file_name: {
     type: String,
@@ -50,5 +51,9 @@ const diagnosticReportSchema = new mongoose.Schema({
     default: null,
   },
 });
+
+diagnosticReportSchema.index({ patient_id: 1, status: 1, published_at: -1 });
+diagnosticReportSchema.index({ laboratory_id: 1, status: 1, created_at: -1 });
+diagnosticReportSchema.index({ report_hash: 1 });
 
 module.exports = mongoose.model('DiagnosticReport', diagnosticReportSchema);

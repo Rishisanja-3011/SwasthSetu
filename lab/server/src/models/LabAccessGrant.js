@@ -16,20 +16,21 @@ const labAccessGrantSchema = new mongoose.Schema({
     ref: 'DiagnosticOrder',
     default: null,
   },
-  granted_at: {
-    type: Date,
-    default: Date.now,
-  },
   status: {
     type: String,
     enum: ['ACTIVE', 'EXPIRED'],
     default: 'ACTIVE',
+    index: true,
   },
-  expires_at: {
-    type: Date,
-    required: true,
-    // By default 48 hours from creation unless terminated upon publish
-    default: () => new Date(Date.now() + 48 * 60 * 60 * 1000),
+  shared_fields: {
+    type: [String],
+    default: ['name', 'date_of_birth', 'gender', 'phone'],
+    validate: {
+      validator: (fields) =>
+        fields.length === 4 &&
+        ['name', 'date_of_birth', 'gender', 'phone'].every((field) => fields.includes(field)),
+      message: 'A lab grant must expose exactly the four approved identity fields.',
+    },
   },
   published_report_id: {
     type: mongoose.Schema.Types.ObjectId,
@@ -38,9 +39,11 @@ const labAccessGrantSchema = new mongoose.Schema({
   },
 });
 
-// Helper method to check if grant is actively valid
+// Laboratory access ends only when the associated report is published.
 labAccessGrantSchema.methods.isValid = function () {
-  return this.status === 'ACTIVE' && new Date() < new Date(this.expires_at);
+  return this.status === 'ACTIVE';
 };
+
+labAccessGrantSchema.index({ patient_id: 1, laboratory_id: 1, status: 1 });
 
 module.exports = mongoose.model('LabAccessGrant', labAccessGrantSchema);

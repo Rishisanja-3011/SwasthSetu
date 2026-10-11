@@ -1,14 +1,17 @@
 import React from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Stethoscope, CheckCircle2, RefreshCw, Building2, MapPin, Award } from 'lucide-react';
-import { REGISTERED_DOCTORS } from '../services/patientApi';
 
 export function DoctorConfirmScreen() {
   const location = useLocation();
   const navigate = useNavigate();
 
-  // Pick passed doctor from state or fallback to default Dr. Mehta
-  const doctor = location.state?.doctor || REGISTERED_DOCTORS[0];
+  const doctor = location.state?.doctor;
+
+  if (!doctor) {
+    navigate('/');
+    return null;
+  }
 
   const handleConfirm = () => {
     navigate('/visit-type', { state: { doctor } });

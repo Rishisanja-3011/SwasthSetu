@@ -45,12 +45,7 @@ export function IntakeReviewScreen() {
     setSubmitting(true);
     try {
       // 1. Create Encounter in OPEN state
-      const encounter = await patientApi.createEncounter({
-        patient,
-        doctor,
-        visitType,
-        doctorAccessGranted,
-      });
+      const encounter = await patientApi.createEncounter({ doctor, visitType });
 
       // 2. Submit Structured Symptom Intake
       const structured = {
@@ -68,7 +63,7 @@ export function IntakeReviewScreen() {
         confidence: initialStructured.confidence,
       });
 
-      updateActiveEncounter(encounter);
+      updateActiveEncounter({ ...encounter, intake: structured });
 
       // 3. Navigate to Live Waiting Cockpit
       navigate('/waiting', { replace: true });

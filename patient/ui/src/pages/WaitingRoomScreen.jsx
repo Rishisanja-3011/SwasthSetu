@@ -28,24 +28,31 @@ export function WaitingRoomScreen() {
     }
   }, [activeEncounter]);
 
-  // Reactive listener: Polls and listens for Doctor Module encounter changes
+  // Poll the server-side encounter boundary; local storage only carries the
+  // encounter identifier across a page refresh.
   useEffect(() => {
-    const handlePoll = () => {
-      const updated = patientApi.getActiveEncounter();
-      if (updated && (!activeEncounter || updated.lifecycle_state !== activeEncounter.lifecycle_state)) {
-        updateActiveEncounter(updated);
-        setCurrentStep(updated.lifecycle_state);
+    let cancelled = false;
+    const refresh = async () => {
+      if (!activeEncounter?.id) return;
+      try {
+        const updated = await patientApi.refreshEncounter(activeEncounter.id);
+        if (!cancelled) {
+          updateActiveEncounter(updated);
+          setCurrentStep(updated.lifecycle_state);
+        }
+      } catch (error) {
+        if (error.status === 401 && !cancelled) navigate('/login', { replace: true });
       }
     };
 
-    const interval = setInterval(handlePoll, 2000);
-    window.addEventListener('storage', handlePoll);
+    refresh();
+    const interval = setInterval(refresh, 2500);
 
     return () => {
+      cancelled = true;
       clearInterval(interval);
-      window.removeEventListener('storage', handlePoll);
     };
-  }, [activeEncounter]);
+  }, [activeEncounter?.id, navigate, updateActiveEncounter]);
 
   if (!activeEncounter) return null;
 

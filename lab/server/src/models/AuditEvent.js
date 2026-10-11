@@ -13,6 +13,7 @@ const auditEventSchema = new mongoose.Schema({
   action: {
     type: String,
     required: true, // e.g. "VIEW_IDENTITY", "CBC_EXTRACTION", "OBSERVATION_UPDATE", "REPORT_PUBLISH", "GRANT_EXPIRED"
+    index: true,
   },
   resource_type: {
     type: String,
@@ -39,7 +40,11 @@ const auditEventSchema = new mongoose.Schema({
   timestamp: {
     type: Date,
     default: Date.now,
+    index: true,
   },
 });
+
+auditEventSchema.index({ patient_id: 1, timestamp: -1 });
+auditEventSchema.index({ resource_type: 1, resource_id: 1, timestamp: -1 });
 
 module.exports = mongoose.model('AuditEvent', auditEventSchema);

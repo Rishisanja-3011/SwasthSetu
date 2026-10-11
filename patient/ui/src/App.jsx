@@ -5,19 +5,30 @@ import { Navbar } from './components/Navbar';
 import { BottomNav } from './components/BottomNav';
 import { NetworkStatusBanner } from './components/NetworkStatusBanner';
 import { AppRoutes } from './routes/AppRoutes';
+import { usePatient } from './context/PatientContext';
+import FloatingMediBot from './components/FloatingMediBot';
+
+function AppShell() {
+  const { isAuthenticated } = usePatient();
+
+  return (
+    <div className="app-container">
+      {isAuthenticated && <Navbar />}
+      <NetworkStatusBanner />
+      <main className="main-content">
+        <AppRoutes />
+      </main>
+      {isAuthenticated && <BottomNav />}
+      {isAuthenticated && <FloatingMediBot />}
+    </div>
+  );
+}
 
 export function App() {
   return (
     <PatientProvider>
       <BrowserRouter>
-        <div className="app-container">
-          <Navbar />
-          <NetworkStatusBanner />
-          <main className="main-content">
-            <AppRoutes />
-          </main>
-          <BottomNav />
-        </div>
+        <AppShell />
       </BrowserRouter>
     </PatientProvider>
   );

@@ -18,13 +18,15 @@ const encounterSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['WAITING', 'IN_CONSULTATION', 'CLOSED'],
-    default: 'WAITING',
+    enum: ['OPEN', 'CLOSED'],
+    default: 'OPEN',
+    index: true,
   },
-  lifecycle_state: {
+  queue_status: {
     type: String,
-    enum: ['WAITING', 'DOCTOR_REVIEWING', 'PLEASE_COME_IN', 'COMPLETED', 'CONSULTATION_COMPLETED'],
+    enum: ['WAITING', 'DOCTOR_REVIEWING', 'IN_CONSULTATION', 'CALLED'],
     default: 'WAITING',
+    index: true,
   },
   queue_number: {
     type: Number,
@@ -41,7 +43,11 @@ const encounterSchema = new mongoose.Schema({
   created_at: {
     type: Date,
     default: Date.now,
+    index: true,
   },
 });
+
+encounterSchema.index({ doctor_id: 1, status: 1, created_at: 1 });
+encounterSchema.index({ patient_id: 1, doctor_id: 1, created_at: -1 });
 
 module.exports = mongoose.model('Encounter', encounterSchema);
