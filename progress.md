@@ -17,7 +17,7 @@
   - An SMS adapter can be added later.
 - Atlas network access decision: use `0.0.0.0/0` for this college-project development environment so changing networks does not require changing the Atlas allowlist.
 - Laboratory grants do not use time-based expiry. They become `EXPIRED` when the associated report is published.
-- `775dacb` is pushed to `origin/main`. The current patient UI/backend integration changes are local and should be committed only after the focused checks below are reviewed.
+- `775dacb` is pushed to `origin/main`. The patient UI/backend integration is committed locally as `19f2f92`; this new commit has not been pushed by the assistant.
 
 ## Completed database foundation
 
