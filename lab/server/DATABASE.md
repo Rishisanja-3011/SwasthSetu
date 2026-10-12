@@ -11,13 +11,13 @@ legacy reference and is not modified by this project.
 | `users` | Role-bearing platform identities: `PATIENT`, `DOCTOR`, `LABORATORY` |
 | `patients` | The central patient record and platform Patient ID |
 | `doctors` | Registered doctors and doctor QR/code identities |
-| `laboratories` | Approved laboratory providers and lab QR/code identities |
+| `laboratories` | Active self-registered laboratory providers and lab QR/code identities |
 | `encounters` | Doctor consultations with `OPEN`/`CLOSED` access boundaries |
 | `symptomintakes` | Patient-confirmed transcript and structured intake |
 | `consultationnotes` | Doctor notes scoped to one doctor-patient encounter |
 | `diagnosticorders` | Tests ordered from a doctor encounter |
 | `labaccessgrants` | Four-field laboratory permission, expired on publication |
-| `diagnosticreports` | CBC report processing and publication state |
+| `diagnosticreports` | Report extraction, review, and publication state |
 | `reportfiles` | Immutable original PDF metadata and storage reference |
 | `labobservations` | Extracted, normalized, validated CBC observations |
 | `aiartifacts` | AI-generated content with an explicit source reference |
@@ -69,7 +69,26 @@ Provider metadata can be resolved without authentication through
 `GET /api/providers/resolve/:providerCode`. It returns only public provider
 metadata and never patient history.
 
-For local approved laboratory onboarding, use the backend-only helper:
+Laboratories self-register from the laboratory portal through:
+
+```text
+POST /api/auth/laboratory/register
+```
+
+The response returns an active session and a collision-resistant `LAB-*` ID.
+Returning laboratory operators sign in through `/api/auth/provider/login` with
+the generated ID and registered phone. The old backend-only onboarding helper
+is retained for migrations and fixtures.
+
+The canonical Python extraction pipeline is invoked by the Node laboratory
+upload route through `extraction/bridge.py`. Install the root
+`requirements.txt` dependencies and set `PYTHON_EXECUTABLE` in `lab/server/.env`
+if the runtime is not available as `python` on PATH. PDF uploads are stored as
+immutable originals, processed by the text/OCR pipeline, and persisted as
+`labobservations`; any extraction or quality-review signal keeps publication
+blocked until the laboratory resolves it.
+
+For migration fixtures, use the backend-only helper:
 
 ```text
 node scripts/onboardLaboratory.js --name "Laboratory name" --phone "+919000000002" --code "LAB-102" --location "City"

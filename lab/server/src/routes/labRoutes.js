@@ -5,8 +5,9 @@ const {
 } = require('../models');
 const { requireLabOperator, enforceActiveLabGrant } = require('../middleware/labAccess');
 const {
-  decodeOriginalPdf, storeOriginalPdf, removeOriginalPdf, downloadOriginalPdf,
+  decodeOriginalPdf, storeOriginalPdf, originalFilePath, removeOriginalPdf, downloadOriginalPdf,
 } = require('../services/reportFiles');
+const { runExtraction } = require('../services/extractionRunner');
 
 const router = express.Router();
 router.use(requireLabOperator);
@@ -63,6 +64,9 @@ function orderSummary(order) {
 }
 
 function reportSummary(report, active = false) {
+  const source = report.extraction_source && typeof report.extraction_source === 'object'
+    ? { ...report.extraction_source, path: undefined }
+    : report.extraction_source;
   return {
     _id: report._id,
     lab_access_grant_id: report.lab_access_grant_id,
@@ -70,8 +74,49 @@ function reportSummary(report, active = false) {
     status: report.status,
     created_at: report.created_at,
     published_at: report.published_at,
+    extraction_review_required: report.extraction_review_required,
+    publish_blocking_reasons: report.publish_blocking_reasons || [],
+    extraction_source: source,
+    extraction_coverage: report.extraction_coverage,
+    extraction_validation: report.extraction_validation,
     ...(active ? { original_file_name: report.original_file_name, report_hash: report.report_hash } : {}),
   };
+}
+
+function extractionObservation(test, source) {
+  const reference = test.reference_parsed || {};
+  const value = Number(test.value);
+  const confidence = Number(
+    test.extraction_confidence
+      ?? source?.ocr_confidence
+      ?? 1,
+  );
+  const reviewReasons = Array.isArray(test.review_reasons) ? test.review_reasons : [];
+  const status = ['HIGH', 'LOW', 'NORMAL'].includes(test.status) ? test.status : null;
+  return {
+    test_name_original: test.raw_name || test.canonical_name || 'Unknown test',
+    test_name_normalized: test.canonical_name || test.raw_name || 'Unknown test',
+    value,
+    unit: test.unit || null,
+    reference_low: reference.parsed ? Number(reference.min) : null,
+    reference_high: reference.parsed ? Number(reference.max) : null,
+    flag: status,
+    extraction_confidence: Number.isFinite(confidence) ? Math.max(0, Math.min(1, confidence)) : 0,
+    validation_status: test.needs_review ? 'NEEDS_REVIEW' : 'OK',
+    review_reason: reviewReasons.length ? reviewReasons.join('; ') : null,
+  };
+}
+
+function extractionReportStatus(extraction) {
+  const validation = extraction.validation || {};
+  const tests = Array.isArray(extraction.tests) ? extraction.tests : [];
+  const coverage = extraction.coverage || {};
+  const hasReview = Boolean(extraction.review_required)
+    || tests.some((test) => test.needs_review)
+    || validation.status !== 'VALID'
+    || coverage.status === 'INCOMPLETE'
+    || !tests.length;
+  return hasReview ? 'NEEDS_REVIEW' : 'PROCESSING';
 }
 
 function audit(req, report, action, details = {}) {
@@ -163,8 +208,6 @@ router.get('/grant/:grantId/patient-identity', enforceActiveLabGrant, handle(asy
   res.json({ success: true, grant_status: 'ACTIVE', identity: identity(grant.patient_id), order: orderSummary(grant.diagnostic_order_id) });
 }));
 
-// Preserve the PDF only. A future server-side extraction worker will produce
-// observations and move UPLOADED to PROCESSING/NEEDS_REVIEW; browser text is not evidence.
 router.post(['/upload-report', '/generate-report'], enforceActiveLabGrant, handle(async (req, res) => {
   let original;
   try { original = decodeOriginalPdf(req.body); } catch (error) { fail(400, error.message); }
@@ -174,6 +217,27 @@ router.post(['/upload-report', '/generate-report'], enforceActiveLabGrant, handl
     || grant.diagnostic_order_id.status !== 'ORDERED')) fail(409, 'INVALID_DIAGNOSTIC_ORDER');
   const reportId = new mongoose.Types.ObjectId();
   const metadata = await storeOriginalPdf(reportId, original);
+  let extraction;
+  try {
+    extraction = await runExtraction(originalFilePath(metadata));
+  } catch (error) {
+    await removeOriginalPdf(metadata);
+    if (error.code === 'EXTRACTION_RUNTIME_UNAVAILABLE') fail(503, 'EXTRACTION_RUNTIME_UNAVAILABLE');
+    if (error.code === 'EXTRACTION_TIMEOUT') fail(504, 'EXTRACTION_TIMEOUT');
+    fail(422, 'REPORT_EXTRACTION_FAILED');
+  }
+
+  const extractedTests = Array.isArray(extraction.tests) ? extraction.tests : [];
+  const observations = extractedTests
+    .filter((test) => Number.isFinite(Number(test.value)))
+    .map((test) => extractionObservation(test, extraction.source));
+  const reportStatus = extractionReportStatus(extraction);
+  const extractionWarnings = [
+    ...(Array.isArray(extraction.source?.warnings) ? extraction.source.warnings : []),
+    ...(Array.isArray(extraction.validation?.issues)
+      ? extraction.validation.issues.map((issue) => issue.message).filter(Boolean)
+      : []),
+  ];
   let report;
   try {
     await mongoose.connection.transaction(async (session) => {
@@ -185,18 +249,53 @@ router.post(['/upload-report', '/generate-report'], enforceActiveLabGrant, handl
       [report] = await DiagnosticReport.create([{
         _id: reportId, patient_id: grant.patient_id._id, laboratory_id: req.laboratory._id,
         lab_access_grant_id: grant._id, diagnostic_order_id: grant.diagnostic_order_id?._id || null,
-        status: 'UPLOADED', test_type: grant.diagnostic_order_id?.test_type || 'CBC',
-        report_hash: original.sha256, original_file_name: original.filename, report_source_type: 'LAB_UPLOADED_ORIGINAL',
-      }], { session });
-      await ReportFile.create([metadata], { session });
-      await AuditEvent.create([audit(req, report, 'LAB_REPORT_UPLOADED')], { session });
+         status: reportStatus, test_type: grant.diagnostic_order_id?.test_type || 'CBC',
+         report_hash: original.sha256, original_file_name: original.filename, report_source_type: 'LAB_UPLOADED_ORIGINAL',
+         raw_text_content: extraction.raw_text || '',
+         extraction_source: extraction.source || null,
+         extraction_patient_context: extraction.patient || null,
+         extraction_coverage: extraction.coverage || null,
+         extraction_validation: extraction.validation || null,
+         extraction_warnings: extractionWarnings,
+         publish_blocking_reasons: extraction.publish_blocking_reasons || [],
+         extraction_review_required: Boolean(extraction.review_required) || reportStatus === 'NEEDS_REVIEW',
+         extraction_completed_at: new Date(),
+       }], { session });
+       await ReportFile.create([metadata], { session });
+       if (observations.length) {
+         await LabObservation.create(observations.map((observation) => ({
+           ...observation,
+           report_id: report._id,
+         })), { session });
+       }
+       await AuditEvent.create([audit(req, report, 'LAB_REPORT_UPLOADED')], { session });
+       await AuditEvent.create([audit(req, report, 'LAB_REPORT_EXTRACTED', {
+         input_type: extraction.source?.input_type,
+         tests_detected: extraction.validation?.tests_detected || extractedTests.length,
+         observations_created: observations.length,
+         report_status: reportStatus,
+       })], { session });
     });
   } catch (error) {
     await removeOriginalPdf(metadata);
     if (error.code === 11000) fail(409, 'REPORT_ALREADY_UPLOADED');
     throw error;
   }
-  res.status(201).json({ success: true, report: reportSummary(report, true), observations: [], extraction_pending: true });
+  res.status(201).json({
+    success: true,
+    report: reportSummary(report, true),
+    observations,
+    extraction_pending: false,
+    needs_review: reportStatus === 'NEEDS_REVIEW',
+    extraction: {
+      source: { ...extraction.source, path: undefined },
+      patient: extraction.patient,
+      coverage: extraction.coverage,
+      validation: extraction.validation,
+      review_required: extraction.review_required,
+      publish_blocking_reasons: extraction.publish_blocking_reasons,
+    },
+  });
 }));
 
 router.get('/report/:reportId', handle(async (req, res) => {

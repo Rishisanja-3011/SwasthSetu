@@ -73,4 +73,10 @@ function downloadOriginalPdf(res, file) {
   });
 }
 
-module.exports = { decodeOriginalPdf, storeOriginalPdf, removeOriginalPdf, downloadOriginalPdf };
+module.exports = {
+  decodeOriginalPdf,
+  storeOriginalPdf,
+  originalFilePath,
+  removeOriginalPdf,
+  downloadOriginalPdf,
+};

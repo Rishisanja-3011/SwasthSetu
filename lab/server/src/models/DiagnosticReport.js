@@ -38,6 +38,38 @@ const diagnosticReportSchema = new mongoose.Schema({
     type: String,
     default: '',
   },
+  extraction_source: {
+    type: mongoose.Schema.Types.Mixed,
+    default: null,
+  },
+  extraction_patient_context: {
+    type: mongoose.Schema.Types.Mixed,
+    default: null,
+  },
+  extraction_coverage: {
+    type: mongoose.Schema.Types.Mixed,
+    default: null,
+  },
+  extraction_validation: {
+    type: mongoose.Schema.Types.Mixed,
+    default: null,
+  },
+  extraction_warnings: {
+    type: [String],
+    default: [],
+  },
+  publish_blocking_reasons: {
+    type: [String],
+    default: [],
+  },
+  extraction_review_required: {
+    type: Boolean,
+    default: false,
+  },
+  extraction_completed_at: {
+    type: Date,
+    default: null,
+  },
   report_hash: {
     type: String,
     default: null,
