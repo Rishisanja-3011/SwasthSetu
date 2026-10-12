@@ -123,6 +123,13 @@ body {
   min-height: 100vh;
 }
 
+.lab-auth-label { display: block; margin: 0.85rem 0 0.35rem; font-size: 0.78rem; font-weight: 700; color: var(--text-secondary); }
+.lab-auth-label span { font-weight: 500; color: var(--text-muted); }
+.lab-auth-input-wrap { position: relative; display: flex; align-items: center; color: var(--text-muted); }
+.lab-auth-input-wrap svg { position: absolute; left: 0.75rem; pointer-events: none; }
+.lab-auth-input-wrap input { width: 100%; padding: 0.68rem 0.85rem 0.68rem 2.25rem; border-radius: var(--radius-md); border: 1px solid var(--border-medium); font-size: 0.88rem; color: var(--text-main); background: var(--bg-surface); }
+.lab-auth-input-wrap input:focus { outline: 2px solid var(--teal-200); border-color: var(--teal-500); }
+
 /* Top Navbar */
 .lab-navbar {
   height: 64px;

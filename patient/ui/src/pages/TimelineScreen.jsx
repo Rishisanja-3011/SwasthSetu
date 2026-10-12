@@ -1,118 +1,95 @@
-import React, { useState, useEffect } from 'react';
-import {
-  Clock,
-  FileText,
-  Stethoscope,
-  Building2,
-  Calendar,
-  CheckCircle2,
-  ShieldCheck,
-  ChevronRight,
-} from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
+import { CalendarDays, Stethoscope, Building2, FlaskConical, ChevronRight, FileText, RefreshCw } from 'lucide-react';
 import { usePatient } from '../context/PatientContext';
 import { patientApi } from '../services/patientApi';
-import { StatusBadge } from '../components/StatusBadge';
+import { PatientDialog } from '../components/PatientDialog';
+import './TimelineScreen.css';
+
+const date = (value, time = false) => value ? new Date(value).toLocaleString(undefined, {
+  day: 'numeric', month: 'short', year: 'numeric', ...(time ? { hour: '2-digit', minute: '2-digit' } : {}),
+}) : 'Not recorded';
+const text = (value) => Array.isArray(value) ? value.join(', ') || 'Not recorded' : typeof value === 'string' && value.trim() ? value : 'Not recorded';
+
+function ConsultationDetails({ consultation }) {
+  const details = consultation.details;
+  const intake = details.intake;
+  const clinical = intake?.structured_data?.clinical_intake || intake?.structured_data || {};
+  return <>
+    <div className="consultation-doctor">
+      <span className="consultation-icon"><Stethoscope size={25} /></span>
+      <div><h3>{details.doctor?.name || 'Doctor unavailable'}</h3><p>{details.doctor?.specialty}</p><p>{details.doctor?.clinic_name}</p></div>
+    </div>
+    <dl className="consultation-facts">
+      <div><dt>Consultation date</dt><dd>{date(details.created_at, true)}</dd></div>
+      <div><dt>Visit</dt><dd>{details.visit_type === 'REVISITING' ? 'Follow-up consultation' : 'New consultation'}</dd></div>
+      <div><dt>Intake submitted</dt><dd>{date(intake?.confirmed_at || intake?.created_at, true)}</dd></div>
+      <div><dt>Status</dt><dd>{details.status === 'CLOSED' ? `Completed · ${date(details.ended_at)}` : 'Open consultation'}</dd></div>
+    </dl>
+    <section className="consultation-section">
+      <h3><FileText size={18} /> Your intake</h3>
+      {!intake ? <p>No intake was submitted for this consultation.</p> : intake.input_mode === 'SKIPPED' ? <p>You chose to skip intake for this visit.</p> : <>
+        <blockquote>{intake.transcript || 'No original statement recorded.'}</blockquote>
+        <dl className="consultation-facts">
+          <div><dt>Chief complaint</dt><dd>{text(intake.chief_complaint || clinical.chief_complaint)}</dd></div>
+          <div><dt>Duration</dt><dd>{text(intake.duration || clinical.duration)}</dd></div>
+          <div><dt>Symptoms</dt><dd>{text(intake.symptoms?.length ? intake.symptoms : clinical.symptoms)}</dd></div>
+          <div><dt>Input</dt><dd>{intake.input_mode === 'VOICE' ? 'Voice' : 'Text'}</dd></div>
+        </dl>
+      </>}
+    </section>
+    <section className="consultation-section">
+      <h3><FlaskConical size={18} /> Tests ordered by your doctor</h3>
+      {details.diagnostic_orders.length === 0 ? <p>No diagnostic tests were ordered during this consultation.</p> : details.diagnostic_orders.map((order) => <article key={order.id} className="consultation-order">
+        <div className="consultation-order-heading"><strong>{order.test_type.replaceAll('_', ' ')}</strong><span className="consultation-status">{order.status === 'COMPLETED' ? 'Completed' : 'Ordered'}</span></div>
+        <p className="consultation-muted">Ordered {date(order.created_at, true)}</p>
+        {order.clinical_notes && <p>{order.clinical_notes}</p>}
+        {order.report ? <Link to={`/report/${order.report.id}`} className="consultation-report-link">View published report · {order.report.laboratory_name}<ChevronRight size={16} /></Link> : <p className="consultation-muted">Published report not yet available.</p>}
+      </article>)}
+    </section>
+    {details.consultation_note && <section className="consultation-section"><h3>Doctor’s consultation notes</h3><p style={{ whiteSpace: 'pre-wrap' }}>{details.consultation_note}</p></section>}
+  </>;
+}
 
 export function TimelineScreen() {
   const { patient } = usePatient();
-  const [events, setEvents] = useState([]);
+  const [consultations, setConsultations] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [reload, setReload] = useState(0);
+  const [params, setParams] = useSearchParams();
+  const selectedId = params.get('consultation');
+  const selected = consultations.find((item) => String(item.details.encounter_id) === selectedId);
 
   useEffect(() => {
-    patientApi.getHealthTimeline().then(setEvents).catch(() => setEvents([]));
-  }, [patient]);
+    let cancelled = false;
+    setLoading(true); setError(''); setConsultations([]);
+    patientApi.getHealthTimeline().then((items) => { if (!cancelled) setConsultations(items); })
+      .catch((err) => { if (!cancelled) setError(err.message || 'Could not load consultations.'); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [patient?.id, reload]);
 
-  const getEventIcon = (type) => {
-    switch (type) {
-      case 'REPORT_PUBLISHED':
-        return <FileText size={18} color="var(--teal-600)" />;
-      case 'CONSULTATION_COMPLETED':
-      case 'ENCOUNTER_CREATED':
-        return <Stethoscope size={18} color="var(--blue-600)" />;
-      case 'LAB_GRANT_APPROVED':
-        return <Building2 size={18} color="#d97706" />;
-      case 'SYMPTOMS_SUBMITTED':
-      default:
-        return <Clock size={18} color="var(--teal-600)" />;
-    }
-  };
-
-  return (
-    <div className="fade-in page-reading-container" style={{ maxWidth: 760, padding: '8px 0' }}>
-      <div style={{ marginBottom: 20 }}>
-        <h2 style={{ fontSize: '1.4rem', color: 'var(--navy-900)', marginBottom: 4 }}>
-          Patient Health Timeline
-        </h2>
-        <p style={{ fontSize: '0.86rem', color: 'var(--slate-600)' }}>
-          A simple chronological history of consultations, symptom submissions, and published laboratory reports.
-        </p>
-      </div>
-
-      <div style={{ position: 'relative', paddingLeft: 24 }}>
-        {/* Continuous Vertical Timeline Line */}
-        <div style={{
-          position: 'absolute',
-          left: 10,
-          top: 8,
-          bottom: 8,
-          width: 2,
-          backgroundColor: 'var(--border-subtle)',
-        }} />
-
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-          {events.map((event) => (
-            <div key={event.id} style={{ position: 'relative' }}>
-              {/* Timeline Marker Dot */}
-              <div style={{
-                position: 'absolute',
-                left: -24,
-                top: 4,
-                width: 22,
-                height: 22,
-                borderRadius: '50%',
-                backgroundColor: '#ffffff',
-                border: '2px solid var(--teal-500)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                boxShadow: '0 2px 6px rgba(0,0,0,0.06)',
-              }}>
-                <div style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: 'var(--teal-600)' }} />
-              </div>
-
-              {/* Event Card */}
-              <div className="v-card" style={{ padding: '14px 16px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    {getEventIcon(event.type)}
-                    <h4 style={{ fontSize: '0.98rem', color: 'var(--navy-900)' }}>
-                      {event.title}
-                    </h4>
-                  </div>
-                  <span style={{ fontSize: '0.72rem', color: 'var(--slate-500)', fontFamily: 'var(--font-mono)' }}>
-                    {new Date(event.timestamp).toLocaleDateString()}
-                  </span>
-                </div>
-
-                <div style={{ fontSize: '0.82rem', color: 'var(--teal-800)', fontWeight: 600, marginBottom: 4 }}>
-                  {event.subtitle}
-                </div>
-
-                {event.details && (
-                  <p style={{ fontSize: '0.78rem', color: 'var(--slate-600)', margin: 0, lineHeight: 1.45 }}>
-                    {event.details}
-                  </p>
-                )}
-
-                {event.badge && (
-                  <div style={{ marginTop: 8 }}>
-                    <StatusBadge status={event.badge} />
-                  </div>
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
+  return <div className="consultation-timeline page-reading-container">
+    <header className="consultation-page-header">
+      <div><span className="consultation-eyebrow">YOUR HEALTH RECORD</span><h1>My consultations</h1><p>Each visit, in one place. Open a consultation to see your intake and ordered tests.</p></div>
+      <button className="btn btn-secondary" onClick={() => setReload((v) => v + 1)} disabled={loading} aria-label="Refresh consultations"><RefreshCw size={17} /></button>
+    </header>
+    {loading ? <div className="consultation-empty" role="status">Loading your consultations…</div> : error ? <div className="consultation-empty" role="alert"><p>{error}</p><button className="btn btn-primary" onClick={() => setReload((v) => v + 1)}>Try again</button></div> : consultations.length === 0 ? <div className="consultation-empty"><CalendarDays size={34} /><h2>Your first visit starts here</h2><p>Your consultations will appear here after you start a doctor visit.</p><Link to="/" className="btn btn-primary">Start a doctor visit</Link></div> : <>
+      <div className="consultation-count">{consultations.length} consultation{consultations.length === 1 ? '' : 's'} · Most recent first</div>
+      <div className="consultation-list">{consultations.map((item) => {
+        const details = item.details;
+        const ordered = details.diagnostic_orders.length;
+        return <button key={item.id} type="button" className="consultation-card" onClick={() => setParams({ consultation: details.encounter_id })} aria-label={`View consultation with ${details.doctor?.name || 'Doctor'} on ${date(item.timestamp)}`}>
+          <span className="consultation-date"><strong>{new Date(item.timestamp).getDate()}</strong><span>{new Date(item.timestamp).toLocaleDateString(undefined, { month: 'short', year: 'numeric' })}</span></span>
+          <span className="consultation-card-main"><span className="consultation-card-top"><strong>{details.doctor?.name || 'Doctor unavailable'}</strong><span className={`consultation-status ${details.status === 'OPEN' ? 'is-open' : ''}`}>{details.status === 'CLOSED' ? 'Completed' : 'Open'}</span></span>
+            <span className="consultation-muted"><Building2 size={14} />{details.doctor?.clinic_name || 'Clinic not recorded'}</span>
+            <span className="consultation-card-bottom"><span>{details.visit_type === 'REVISITING' ? 'Follow-up visit' : 'New consultation'}</span><span><FlaskConical size={14} />{ordered ? `${ordered} test${ordered === 1 ? '' : 's'} ordered` : 'No tests ordered'}</span></span>
+          </span><ChevronRight size={20} className="consultation-chevron" />
+        </button>;
+      })}</div>
+    </>}
+    {selected && <PatientDialog title="Consultation details" onClose={() => setParams({})}><ConsultationDetails consultation={selected} /></PatientDialog>}
+    {!loading && !error && selectedId && !selected && <p role="status">This consultation is not available in your record.</p>}
+  </div>;
 }

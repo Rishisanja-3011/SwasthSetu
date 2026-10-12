@@ -20,6 +20,7 @@ export default function DashboardView({
   onQuickGenerate,
   onOpenQR,
   activeStaff,
+  lab,
 }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
@@ -108,10 +109,10 @@ export default function DashboardView({
               className="btn btn-outline"
               onClick={onOpenQR}
               style={{ fontSize: '0.8rem', padding: '0.4rem 0.85rem' }}
-              title="Display Lab QR code LAB-808 for patient walk-in intake"
+               title="Display this laboratory QR code for patient walk-in intake"
             >
               <QrCode size={15} />
-              <span>Lab QR Code (LAB-808)</span>
+               <span>Lab QR Code ({lab?.qr_code_id || 'ID unavailable'})</span>
             </button>
             <span className="badge badge-normal">{filteredWorklist.length} Records</span>
           </div>

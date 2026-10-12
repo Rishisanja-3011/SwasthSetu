@@ -3,6 +3,7 @@ import { Link, NavLink } from 'react-router-dom';
 import { Activity, ChevronDown, User, ShieldCheck, QrCode, FileText, Clock, MessageSquareHeart } from 'lucide-react';
 import { usePatient } from '../context/PatientContext';
 import { PatientSwitcherModal } from './PatientSwitcherModal';
+import { PatientNotificationBell } from './PatientNotificationBell';
 import './Navbar.css';
 
 export function Navbar() {
@@ -63,6 +64,7 @@ export function Navbar() {
           </nav>
 
           <div className="navbar-right">
+            <PatientNotificationBell />
             <button
               className="patient-badge-btn"
               onClick={() => setShowSwitcher(true)}

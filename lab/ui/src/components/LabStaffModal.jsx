@@ -81,10 +81,10 @@ export default function LabStaffModal({
               <Building2 size={18} color="#38bdf8" />
               <div>
                 <strong style={{ fontSize: '0.88rem', color: '#f8fafc' }}>
-                  {activeLab?.name || 'Lifeline Diagnostic Centre'}
+                  {activeLab?.name || 'Laboratory'}
                 </strong>
                 <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
-                  QR ID: {activeLab?.qr_code_id || 'LAB-808'} · Status: {activeLab?.platform_approval_status || 'APPROVED'}
+                  QR ID: {activeLab?.qr_code_id || 'ID unavailable'} · Status: {activeLab?.platform_approval_status || 'ACTIVE'}
                 </div>
               </div>
             </div>

@@ -1,187 +1,81 @@
 import React, { useState } from 'react';
-import { Activity, User, ArrowRight, ShieldCheck } from 'lucide-react';
+import { Activity, User, ArrowRight, ShieldCheck, Building2, MapPin } from 'lucide-react';
 
-export default function LabLoginView({ onLogin, lab }) {
-  const [phone, setPhone] = useState('+919820011223');
-  const [labCode, setLabCode] = useState(lab?.qr_code_id || 'LAB-808');
+export default function LabLoginView({ onLogin, onRegister, lab }) {
+  const [mode, setMode] = useState('login');
+  const [phone, setPhone] = useState('');
+  const [labCode, setLabCode] = useState(lab?.qr_code_id || '');
+  const [name, setName] = useState('');
+  const [location, setLocation] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const isRegistering = mode === 'register';
+  const handleSubmit = async (event) => {
+    event.preventDefault();
     setErrorMessage('');
+    setSuccessMessage('');
     setIsSubmitting(true);
     try {
-      await onLogin({ labCode, phone });
+      if (isRegistering) {
+        await onRegister({ name, phone, location });
+      } else {
+        await onLogin({ labCode, phone });
+      }
     } catch (error) {
-      setErrorMessage(error.message || 'Laboratory sign-in failed.');
+      setErrorMessage(error.message || `Laboratory ${isRegistering ? 'registration' : 'sign-in'} failed.`);
     } finally {
       setIsSubmitting(false);
     }
   };
 
+  const switchMode = (nextMode) => {
+    setMode(nextMode);
+    setErrorMessage('');
+    setSuccessMessage('');
+  };
+
   return (
-    <div
-      style={{
-        minHeight: '100vh',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: 'var(--bg-page)',
-        padding: '1.5rem',
-      }}
-    >
-      <div
-        className="clinical-card"
-        style={{
-          maxWidth: '440px',
-          width: '100%',
-          padding: '2.5rem 2rem',
-          boxShadow: 'var(--shadow-lg)',
-        }}
-      >
-        {/* Brand Header */}
-        <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-          <div
-            className="brand-icon-box"
-            style={{ width: '48px', height: '48px', margin: '0 auto 1rem auto' }}
-          >
-            <Activity size={26} />
-          </div>
-          <h1
-            style={{
-              fontSize: '1.4rem',
-              fontWeight: 800,
-              color: 'var(--navy-900)',
-              letterSpacing: '-0.02em',
-            }}
-          >
-            VaaniDoc
-          </h1>
-          <p
-            style={{
-              fontSize: '0.85rem',
-              fontWeight: 700,
-              color: 'var(--teal-600)',
-              textTransform: 'uppercase',
-              letterSpacing: '0.06em',
-              marginTop: '0.15rem',
-            }}
-          >
-            Laboratory Portal
-          </p>
-          <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginTop: '0.5rem' }}>
-            Diagnostic sign-in for authorized laboratory personnel
-          </p>
+    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'var(--bg-page)', padding: '1.5rem' }}>
+      <div className="clinical-card" style={{ maxWidth: '470px', width: '100%', padding: '2.5rem 2rem', boxShadow: 'var(--shadow-lg)' }}>
+        <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
+          <div className="brand-icon-box" style={{ width: '48px', height: '48px', margin: '0 auto 1rem auto' }}><Activity size={26} /></div>
+          <h1 style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--navy-900)', letterSpacing: '-0.02em' }}>VaaniDoc</h1>
+          <p style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--teal-600)', textTransform: 'uppercase', letterSpacing: '0.06em', marginTop: '0.15rem' }}>Laboratory Portal</p>
+          <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginTop: '0.5rem' }}>{isRegistering ? 'Register your facility and receive its VaaniDoc ID' : 'Sign in with your laboratory ID and registered phone'}</p>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, padding: 4, background: 'var(--bg-muted)', borderRadius: 'var(--radius-md)', marginBottom: '1.4rem' }}>
+          <button type="button" onClick={() => switchMode('login')} style={{ border: 0, borderRadius: 7, padding: '0.6rem', background: !isRegistering ? 'white' : 'transparent', color: !isRegistering ? 'var(--teal-700)' : 'var(--text-muted)', fontWeight: 700, cursor: 'pointer', boxShadow: !isRegistering ? 'var(--shadow-xs)' : 'none' }}>Returning lab</button>
+          <button type="button" onClick={() => switchMode('register')} style={{ border: 0, borderRadius: 7, padding: '0.6rem', background: isRegistering ? 'white' : 'transparent', color: isRegistering ? 'var(--teal-700)' : 'var(--text-muted)', fontWeight: 700, cursor: 'pointer', boxShadow: isRegistering ? 'var(--shadow-xs)' : 'none' }}>Self-register</button>
         </div>
 
         <form onSubmit={handleSubmit}>
-          {/* Lab Code */}
-          <div style={{ marginBottom: '1.25rem' }}>
-            <label
-              style={{
-                display: 'block',
-                fontSize: '0.78rem',
-                fontWeight: 600,
-                color: 'var(--text-secondary)',
-                marginBottom: '0.35rem',
-              }}
-            >
-              Laboratory Facility ID
-            </label>
-            <input
-              type="text"
-              value={labCode}
-              onChange={(e) => setLabCode(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '0.65rem 0.85rem',
-                borderRadius: 'var(--radius-md)',
-                border: '1px solid var(--border-medium)',
-                fontFamily: 'var(--font-mono)',
-                fontSize: '0.88rem',
-                color: 'var(--text-main)',
-                backgroundColor: 'var(--bg-surface)',
-              }}
-              required
-            />
-          </div>
+          {isRegistering && <>
+            <label className="lab-auth-label" htmlFor="lab-name">Laboratory name</label>
+            <div className="lab-auth-input-wrap"><Building2 size={16} /><input id="lab-name" value={name} onChange={(event) => setName(event.target.value)} placeholder="e.g. Sunrise Diagnostics" required /></div>
+            <label className="lab-auth-label" htmlFor="lab-location">City or facility location <span>(optional)</span></label>
+            <div className="lab-auth-input-wrap"><MapPin size={16} /><input id="lab-location" value={location} onChange={(event) => setLocation(event.target.value)} placeholder="e.g. Ahmedabad" /></div>
+          </>}
 
-          {/* Registered Laboratory Phone */}
-          <div style={{ marginBottom: '1.25rem' }}>
-            <label
-              style={{
-                display: 'block',
-                fontSize: '0.78rem',
-                fontWeight: 600,
-                color: 'var(--text-secondary)',
-                marginBottom: '0.35rem',
-              }}
-            >
-              Registered Laboratory Phone
-            </label>
-            <div style={{ position: 'relative' }}>
-              <input
-                type="text"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '0.65rem 0.85rem 0.65rem 2.25rem',
-                  borderRadius: 'var(--radius-md)',
-                  border: '1px solid var(--border-medium)',
-                  fontSize: '0.88rem',
-                  color: 'var(--text-main)',
-                  backgroundColor: 'var(--bg-surface)',
-                }}
-                required
-              />
-              <User
-                size={16}
-                color="var(--text-muted)"
-                style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)' }}
-              />
-            </div>
-          </div>
+          {!isRegistering && <>
+            <label className="lab-auth-label" htmlFor="lab-code">Laboratory ID / QR code</label>
+            <div className="lab-auth-input-wrap"><Building2 size={16} /><input id="lab-code" value={labCode} onChange={(event) => setLabCode(event.target.value.toUpperCase())} placeholder="LAB-123456" required /></div>
+          </>}
 
-          <div style={{ marginBottom: '1.25rem', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-            Sign-in is tied to the approved laboratory provider account. Staff selection happens inside the authenticated workspace.
-          </div>
+          <label className="lab-auth-label" htmlFor="lab-phone">Registered laboratory phone</label>
+          <div className="lab-auth-input-wrap"><User size={16} /><input id="lab-phone" type="tel" value={phone} onChange={(event) => setPhone(event.target.value)} placeholder="+91 90000 00000" required /></div>
 
-          {errorMessage && (
-            <div style={{ marginBottom: '1rem', padding: '0.65rem 0.8rem', borderRadius: 'var(--radius-md)', backgroundColor: '#fef2f2', color: '#b91c1c', fontSize: '0.8rem' }}>
-              {errorMessage}
-            </div>
-          )}
-
-          {/* Sign In Button */}
-          <button
-            type="submit"
-            className="btn-clinical primary"
-            style={{ width: '100%', padding: '0.75rem', fontSize: '0.9rem' }}
-            disabled={isSubmitting}
-          >
-            <span>{isSubmitting ? 'Signing in...' : 'Sign In to Laboratory Portal'}</span>
-            <ArrowRight size={16} />
+          <p style={{ margin: '0.5rem 0 1.15rem', fontSize: '0.76rem', color: 'var(--text-muted)' }}>{isRegistering ? 'Your facility is active immediately. We generate a unique laboratory ID for patient QR scanning and future sign-in.' : 'The phone must match the number used when this laboratory was registered.'}</p>
+          {errorMessage && <div style={{ marginBottom: '1rem', padding: '0.65rem 0.8rem', borderRadius: 'var(--radius-md)', backgroundColor: '#fef2f2', color: '#b91c1c', fontSize: '0.8rem' }}>{errorMessage}</div>}
+          {successMessage && <div style={{ marginBottom: '1rem', padding: '0.65rem 0.8rem', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--teal-50)', color: 'var(--teal-800)', fontSize: '0.8rem' }}>{successMessage}</div>}
+          <button type="submit" className="btn-clinical primary" style={{ width: '100%', padding: '0.75rem', fontSize: '0.9rem' }} disabled={isSubmitting}>
+            <span>{isSubmitting ? (isRegistering ? 'Registering...' : 'Signing in...') : (isRegistering ? 'Register laboratory' : 'Sign in to laboratory')}</span><ArrowRight size={16} />
           </button>
         </form>
 
-        <div
-          style={{
-            marginTop: '1.5rem',
-            paddingTop: '1rem',
-            borderTop: '1px solid var(--border-light)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '0.5rem',
-            fontSize: '0.75rem',
-            color: 'var(--text-muted)',
-          }}
-        >
-          <ShieldCheck size={14} color="var(--teal-600)" />
-          <span>VaaniDoc 2.0 Bounded Security Compliant</span>
-        </div>
+        <div style={{ marginTop: '1.5rem', paddingTop: '1rem', borderTop: '1px solid var(--border-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', fontSize: '0.75rem', color: 'var(--text-muted)' }}><ShieldCheck size={14} color="var(--teal-600)" /><span>Bounded patient access is enforced per laboratory grant</span></div>
       </div>
     </div>
   );

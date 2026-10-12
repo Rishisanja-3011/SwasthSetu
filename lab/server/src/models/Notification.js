@@ -4,7 +4,7 @@ const notificationSchema = new mongoose.Schema({
   doctor_id: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Doctor',
-    required: true,
+    default: null,
   },
   encounter_id: {
     type: mongoose.Schema.Types.ObjectId,
@@ -18,7 +18,7 @@ const notificationSchema = new mongoose.Schema({
   },
   type: {
     type: String,
-    enum: ['REVISITING_PATIENT_JOINED', 'NEW_PATIENT_JOINED'],
+    enum: ['REVISITING_PATIENT_JOINED', 'NEW_PATIENT_JOINED', 'DIAGNOSTIC_ORDER_CREATED'],
     required: true,
   },
   title: {
@@ -38,6 +38,11 @@ const notificationSchema = new mongoose.Schema({
     type: String,
     default: '#1',
   },
+  diagnostic_order_id: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'DiagnosticOrder',
+    default: null,
+  },
   read: {
     type: Boolean,
     default: false,
@@ -47,5 +52,7 @@ const notificationSchema = new mongoose.Schema({
     default: Date.now,
   },
 });
+
+notificationSchema.index({ patient_id: 1, type: 1, created_at: -1 });
 
 module.exports = mongoose.model('Notification', notificationSchema);

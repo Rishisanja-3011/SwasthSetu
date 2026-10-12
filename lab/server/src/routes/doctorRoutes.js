@@ -438,17 +438,32 @@ router.post('/encounter/:encounterId/order-diagnostic', async (req, res) => {
     const clinicalNotes = typeof req.body.clinical_notes === 'string'
       ? req.body.clinical_notes.trim()
       : '';
-    const order = await DiagnosticOrder.create({
+    let order;
+    await mongoose.connection.transaction(async (session) => {
+      [order] = await DiagnosticOrder.create([{
       encounter_id: encounter._id,
       patient_id: encounter.patient_id._id,
       doctor_id: req.doctor._id,
       test_type: testType,
       clinical_notes: clinicalNotes || 'Routine diagnostic evaluation',
       status: 'ORDERED',
-    });
-    await audit(req, encounter, 'DIAGNOSTIC_ORDER_CREATED', 'SUCCESS', {
-      order_id: order._id.toString(),
-      test_type: order.test_type,
+      }], { session });
+      await Notification.create([{
+      doctor_id: req.doctor._id,
+      encounter_id: encounter._id,
+      patient_id: encounter.patient_id._id,
+      type: 'DIAGNOSTIC_ORDER_CREATED',
+      title: 'Diagnostic test ordered',
+      message: `${req.doctor.name} ordered ${order.test_type} for this consultation. You can take this order to a registered laboratory.`,
+      visit_type: encounter.visit_type,
+      diagnostic_order_id: order._id,
+      }], { session });
+      await AuditEvent.create([{
+        actor_type: 'DOCTOR', actor_id: String(req.doctor._id),
+        action: 'DIAGNOSTIC_ORDER_CREATED', resource_type: 'DiagnosticOrder',
+        resource_id: String(order._id), patient_id: encounter.patient_id._id,
+        outcome: 'SUCCESS', details: { encounter_id: String(encounter._id), test_type: order.test_type },
+      }], { session });
     });
 
     return res.status(201).json({ success: true, order });
@@ -491,10 +506,10 @@ router.get('/notifications/:doctorId', async (req, res) => {
     if (String(req.params.doctorId) !== String(req.doctor._id)) {
       return res.status(403).json({ success: false, error: 'DOCTOR_OWNERSHIP_REQUIRED' });
     }
-    const notifications = await Notification.find({ doctor_id: req.doctor._id })
+    const notifications = await Notification.find({ doctor_id: req.doctor._id, type: { $ne: 'DIAGNOSTIC_ORDER_CREATED' } })
       .sort({ created_at: -1 })
       .limit(25);
-    const unreadCount = await Notification.countDocuments({ doctor_id: req.doctor._id, read: false });
+    const unreadCount = await Notification.countDocuments({ doctor_id: req.doctor._id, type: { $ne: 'DIAGNOSTIC_ORDER_CREATED' }, read: false });
     return res.json({ success: true, notifications, unread_count: unreadCount });
   } catch (error) {
     return res.status(500).json({ success: false, error: 'DOCTOR_NOTIFICATIONS_FAILED' });
@@ -507,7 +522,7 @@ router.post('/notifications/:notificationId/read', async (req, res) => {
       return res.status(404).json({ success: false, error: 'NOTIFICATION_NOT_FOUND' });
     }
     const notification = await Notification.findOneAndUpdate(
-      { _id: req.params.notificationId, doctor_id: req.doctor._id },
+      { _id: req.params.notificationId, doctor_id: req.doctor._id, type: { $ne: 'DIAGNOSTIC_ORDER_CREATED' } },
       { read: true },
       { new: true },
     );
@@ -523,7 +538,7 @@ router.post('/notifications/read-all/:doctorId', async (req, res) => {
     if (String(req.params.doctorId) !== String(req.doctor._id)) {
       return res.status(403).json({ success: false, error: 'DOCTOR_OWNERSHIP_REQUIRED' });
     }
-    await Notification.updateMany({ doctor_id: req.doctor._id, read: false }, { read: true });
+    await Notification.updateMany({ doctor_id: req.doctor._id, type: { $ne: 'DIAGNOSTIC_ORDER_CREATED' }, read: false }, { read: true });
     return res.json({ success: true });
   } catch (error) {
     return res.status(500).json({ success: false, error: 'NOTIFICATIONS_UPDATE_FAILED' });

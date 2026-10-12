@@ -209,7 +209,19 @@ export const patientApi = {
 
   async getHealthTimeline() {
     const result = await request('/patient/timeline');
-    return result.events || [];
+    return result.consultations || [];
+  },
+
+  async getNotifications() {
+    return request('/patient/notifications');
+  },
+
+  async markNotificationRead(id) {
+    return request(`/patient/notifications/${encodeURIComponent(id)}/read`, { method: 'POST' });
+  },
+
+  async markAllNotificationsRead() {
+    return request('/patient/notifications/read-all', { method: 'POST' });
   },
 
   /**

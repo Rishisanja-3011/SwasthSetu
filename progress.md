@@ -3,6 +3,8 @@
 **Last updated:** 2026-10-12  
 **Stopping point:** Patient, MediBot, doctor, and laboratory security/storage integrations are implemented locally. The doctor cockpit now includes original intake, structured intake placeholders, previous same-doctor structured intake, notes, and reports. The future multilingual extraction specification is documented in `pipeline.md`; live Windows patient-to-doctor/laboratory verification and extraction-service integration remain next.
 
+**Current implementation pass:** Consultation cards/detail view and patient diagnostic-order notifications are now connected to the patient API. Laboratory self-registration now creates an active account with a collision-resistant `LAB-*` ID, a real QR representation, and code-plus-phone login. Patient-to-laboratory and live Windows/Atlas workflow verification remain next.
+
 ## Project rules and decisions
 
 - The final source of truth is:
@@ -93,6 +95,7 @@ POST /api/auth/patient/request-otp
 POST /api/auth/patient/verify-otp
 POST /api/auth/patient/register
 POST /api/auth/doctor/register
+POST /api/auth/laboratory/register
 POST /api/auth/provider/login
 GET  /api/auth/me
 GET  /api/providers/resolve/:providerCode

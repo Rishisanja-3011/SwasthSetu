@@ -1,5 +1,6 @@
 import React from 'react';
 import { Building2, X, ShieldCheck, Award, MapPin, Phone, Hash } from 'lucide-react';
+import { QRCodeSVG } from 'qrcode.react';
 
 export default function LabProfileModal({ isOpen, onClose, lab }) {
   if (!isOpen) return null;
@@ -31,12 +32,21 @@ export default function LabProfileModal({ isOpen, onClose, lab }) {
           <div style={{ padding: '0.75rem 1rem', background: 'var(--bg-subtle)', borderRadius: 'var(--radius-md)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-main)' }}>
-                {lab?.name || 'Lifeline Diagnostic Centre'}
+                {lab?.name || 'Laboratory'}
               </span>
-              <span className="badge-pill normal">Verified Lab</span>
+               <span className="badge-pill normal">Active account</span>
             </div>
             <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
               Clinical Pathology & Hematology Diagnostic Center
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '1rem', border: '1px solid var(--teal-mint-border)', borderRadius: 'var(--radius-md)', background: 'var(--teal-50)' }}>
+            <QRCodeSVG value={lab?.qr_code_id || 'LABORATORY_ID_UNAVAILABLE'} size={112} bgColor="#ffffff" fgColor="#0a2540" level="M" includeMargin />
+            <div>
+              <div style={{ fontSize: '0.72rem', textTransform: 'uppercase', color: 'var(--teal-700)', fontWeight: 700 }}>Patient scan QR</div>
+              <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '0.3rem' }}>Patients can scan this code to identify your facility and approve a bounded lab access grant.</p>
+              <div style={{ marginTop: '0.5rem', fontFamily: 'var(--font-mono)', fontWeight: 700, fontSize: '0.85rem' }}>{lab?.qr_code_id || 'ID unavailable'}</div>
             </div>
           </div>
 
@@ -49,7 +59,7 @@ export default function LabProfileModal({ isOpen, onClose, lab }) {
                   Registered Lab QR ID
                 </div>
                 <div style={{ fontSize: '0.88rem', fontWeight: 700, fontFamily: 'var(--font-mono)', color: 'var(--text-main)' }}>
-                  {lab?.qr_code_id || 'LAB-808'}
+                  {lab?.qr_code_id || 'ID unavailable'}
                 </div>
               </div>
             </div>
@@ -61,10 +71,10 @@ export default function LabProfileModal({ isOpen, onClose, lab }) {
                   Accreditation & License
                 </div>
                 <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-main)' }}>
-                  NABL ISO 15189:2022 (Cert: MC-3904)
+                   Facility credentials supplied by the laboratory
                 </div>
                 <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-                  License: {lab?.license_number || 'DL-LAB-2024-8841'}
+                   No accreditation details have been added
                 </div>
               </div>
             </div>
@@ -76,7 +86,7 @@ export default function LabProfileModal({ isOpen, onClose, lab }) {
                   Facility Address
                 </div>
                 <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-                  {lab?.address || 'Suite 204, Meditech Diagnostic Plaza, Subhash Road, Ahmedabad - 380009'}
+                   {lab?.address || lab?.location || 'Location not provided'}
                 </div>
               </div>
             </div>
@@ -88,7 +98,7 @@ export default function LabProfileModal({ isOpen, onClose, lab }) {
                   Direct Laboratory Phone
                 </div>
                 <div style={{ fontSize: '0.85rem', fontFamily: 'var(--font-mono)', color: 'var(--text-main)' }}>
-                  {lab?.phone || '+91 79 2658 9000'}
+                   {lab?.phone || lab?.contact_phone || 'Phone not provided'}
                 </div>
               </div>
             </div>

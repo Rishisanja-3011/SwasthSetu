@@ -106,7 +106,7 @@ export default function PatientPortalPreviewModal({
                     Report Published & Locked
                   </span>
                   <div style={{ fontSize: '0.75rem', color: '#94a3b8', marginTop: '0.35rem' }}>
-                    {data.laboratory?.name || 'Lifeline Diagnostic Centre'}
+                    {data.laboratory?.name || 'Laboratory'}
                   </div>
                 </div>
               </div>

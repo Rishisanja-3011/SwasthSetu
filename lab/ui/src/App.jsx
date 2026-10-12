@@ -176,6 +176,30 @@ export default function App() {
       name: data.provider.name,
       qr_code_id: data.provider.provider_code,
       location: data.provider.location,
+      contact_phone: data.provider.contact_phone,
+    });
+    setIsLoggedIn(true);
+    setCurrentView('dashboard');
+  };
+
+  const handleLabRegister = async ({ name, phone, location }) => {
+    const response = await fetch('/api/auth/laboratory/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, phone, location }),
+    });
+    const data = await response.json();
+    if (!response.ok || !data.success) {
+      throw new Error(data.message || data.error || 'Laboratory registration failed.');
+    }
+    localStorage.setItem('vaanidoc_lab_access_token', data.access_token);
+    setAccessToken(data.access_token);
+    setLab({
+      _id: data.laboratory.id,
+      name: data.laboratory.name,
+      qr_code_id: data.laboratory.qr_code_id,
+      location: data.laboratory.location,
+      contact_phone: data.laboratory.contact_phone,
     });
     setIsLoggedIn(true);
     setCurrentView('dashboard');
@@ -326,6 +350,7 @@ export default function App() {
       <LabLoginView
         lab={lab}
         onLogin={handleLabLogin}
+        onRegister={handleLabRegister}
       />
     );
   }

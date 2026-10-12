@@ -20,6 +20,10 @@ env/
 .env
 **/.env
 
+# JavaScript dependencies and build output
+**/node_modules/
+**/dist/
+
 # Pytest
 
 .pytest_cache/

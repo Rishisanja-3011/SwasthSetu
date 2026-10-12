@@ -54,7 +54,7 @@ export default function Navbar({
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.82rem', color: '#cbd5e1' }}>
           <Building2 size={15} color="#94a3b8" />
           <strong style={{ maxWidth: '140px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {lab?.name || 'Lifeline Diagnostics'}
+            {lab?.name || 'Laboratory'}
           </strong>
           <button
             onClick={onOpenQRModal}
@@ -62,7 +62,7 @@ export default function Navbar({
             style={{ cursor: 'pointer', border: '1px solid #0284c7', padding: '0.15rem 0.45rem' }}
             title="View Lab QR Code"
           >
-            {lab?.qr_code_id || 'LAB-808'}
+            {lab?.qr_code_id || 'ID unavailable'}
           </button>
         </div>
 

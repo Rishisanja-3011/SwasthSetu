@@ -1,0 +1,7 @@
+.patient-dialog { margin: auto; padding: 0; width: min(720px, calc(100% - 28px)); max-height: calc(100dvh - 40px); border: 1px solid #e2e8f0; border-radius: 20px; background: white; color: var(--navy-900); box-shadow: 0 24px 80px #0a254033; }
+.patient-dialog::backdrop { background: #0a254099; }
+.patient-dialog-header { position: sticky; top: 0; background: white; border-bottom: 1px solid #e8edf2; padding: 20px 24px; display: flex; align-items: center; justify-content: space-between; gap: 16px; z-index: 1; }
+.patient-dialog-header h2 { font-size: 1.2rem; }
+.patient-dialog-close { display: grid; place-items: center; background: #f1f5f9; border: 0; border-radius: 10px; padding: 10px; cursor: pointer; color: #475569; }
+.patient-dialog-body { padding: 24px; }
+@media(max-width: 480px) { .patient-dialog-body, .patient-dialog-header { padding: 18px; } }

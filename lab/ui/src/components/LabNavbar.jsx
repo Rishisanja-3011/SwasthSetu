@@ -24,8 +24,8 @@ export default function LabNavbar({
         {/* Lab Identity */}
         <div className="lab-identity-badge">
           <Building2 size={16} color="var(--text-muted)" />
-          <strong style={{ color: 'var(--text-main)' }}>{lab?.name || 'Lifeline Diagnostic Centre'}</strong>
-          <span className="lab-code-pill">{lab?.qr_code_id || 'LAB-808'}</span>
+          <strong style={{ color: 'var(--text-main)' }}>{lab?.name || 'Laboratory'}</strong>
+          <span className="lab-code-pill">{lab?.qr_code_id || 'ID unavailable'}</span>
         </div>
 
         {/* Informative Bounded Access Pill (Informational only, NO revoke button) */}

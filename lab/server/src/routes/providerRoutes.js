@@ -13,7 +13,7 @@ router.get('/resolve/:providerCode', async (req, res) => {
       return res.status(404).json({
         success: false,
         error: 'PROVIDER_NOT_FOUND',
-        message: 'Unknown or unapproved doctor/laboratory code.',
+        message: 'Unknown or inactive doctor/laboratory code.',
       });
     }
     return res.json({ success: true, provider: publicProvider(provider) });

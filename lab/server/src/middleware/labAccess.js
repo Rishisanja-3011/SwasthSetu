@@ -6,13 +6,13 @@ async function loadOwnedLaboratory(req, res, next) {
   try {
     const laboratory = await Laboratory.findOne({
       user_id: req.auth.sub,
-      platform_approval_status: 'APPROVED',
+      platform_approval_status: { $ne: 'REVOKED' },
     });
 
     if (!laboratory) {
       return res.status(403).json({
         success: false,
-        error: 'APPROVED_LABORATORY_PROFILE_REQUIRED',
+        error: 'LABORATORY_PROFILE_REQUIRED',
       });
     }
 

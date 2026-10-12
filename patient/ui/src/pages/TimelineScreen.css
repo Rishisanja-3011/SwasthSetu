@@ -1,0 +1,36 @@
+.consultation-timeline { max-width: 850px; padding: 10px 0 30px; }
+.consultation-page-header { display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; margin-bottom: 28px; }
+.consultation-eyebrow { font-size: .7rem; font-weight: 800; letter-spacing: .13em; color: var(--teal-700); }
+.consultation-page-header h1 { font-size: 1.8rem; color: var(--navy-900); margin: 6px 0; }
+.consultation-page-header p, .consultation-muted { color: var(--slate-500); font-size: .85rem; }
+.consultation-count { font-size: .8rem; color: var(--slate-500); margin-bottom: 14px; }
+.consultation-list { display: grid; gap: 14px; }
+.consultation-card { display: flex; align-items: center; gap: 20px; text-align: left; width: 100%; padding: 22px; background: white; border: 1px solid #e2e8f0; border-radius: 16px; color: var(--navy-900); font: inherit; cursor: pointer; box-shadow: 0 3px 12px #0a254005; transition: border-color .15s, box-shadow .15s; }
+.consultation-card:hover, .consultation-card:focus-visible { border-color: var(--teal-500); box-shadow: 0 5px 20px #008f6f12; }
+.consultation-date { min-width: 76px; display: flex; flex-direction: column; align-items: center; padding: 12px 8px; background: #edf9f6; border-radius: 12px; color: var(--teal-800); }
+.consultation-date strong { font-size: 1.6rem; line-height: 1.2; }
+.consultation-date span { font-size: .72rem; margin-top: 4px; }
+.consultation-card-main { flex: 1; min-width: 0; display: grid; gap: 8px; }
+.consultation-card-top, .consultation-card-bottom, .consultation-order-heading { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; align-items: center; }
+.consultation-card-top > strong { font-size: 1.02rem; }
+.consultation-card-main .consultation-muted, .consultation-card-bottom > span, .consultation-report-link { display: flex; align-items: center; gap: 6px; }
+.consultation-card-bottom { justify-content: flex-start; gap: 16px; font-size: .78rem; color: var(--slate-600); }
+.consultation-status { padding: 4px 9px; border-radius: 20px; background: #f1f5f9; color: #475569; font-size: .7rem; font-weight: 700; }
+.consultation-status.is-open { background: #e6f7f4; color: #007a60; }
+.consultation-chevron { color: var(--slate-400); flex-shrink: 0; }
+.consultation-empty { padding: 48px 24px; border: 1px dashed #cbd5e1; border-radius: 16px; text-align: center; color: var(--slate-500); display: grid; gap: 12px; justify-items: center; }
+.consultation-empty h2 { font-size: 1.15rem; color: var(--navy-900); }
+.consultation-doctor { display: flex; align-items: center; gap: 14px; margin-bottom: 20px; }
+.consultation-doctor p { font-size: .84rem; color: var(--slate-500); }
+.consultation-icon { background: #e6f7f4; color: #007a60; border-radius: 14px; padding: 14px; display: flex; }
+.consultation-facts { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; padding: 18px; background: #f8fafc; border-radius: 12px; }
+.consultation-facts dt { font-size: .72rem; color: var(--slate-500); margin-bottom: 5px; }
+.consultation-facts dd { font-size: .85rem; font-weight: 600; overflow-wrap: anywhere; }
+.consultation-section { margin-top: 24px; }
+.consultation-section h3 { display: flex; gap: 8px; align-items: center; font-size: 1rem; margin-bottom: 12px; }
+.consultation-section p { font-size: .86rem; line-height: 1.6; }
+.consultation-section blockquote { border-left: 3px solid #00a884; padding: 12px 16px; margin-bottom: 14px; white-space: pre-wrap; background: #f8fafc; font-size: .9rem; }
+.consultation-order { border: 1px solid #e2e8f0; padding: 16px; border-radius: 12px; margin-top: 10px; }
+.consultation-order p { margin-top: 6px; }
+.consultation-report-link { color: var(--teal-700); font-size: .84rem; margin-top: 12px; font-weight: 600; }
+@media(max-width: 520px) { .consultation-card { padding: 15px; gap: 12px; } .consultation-date { min-width: 62px; } .consultation-card-top { align-items: flex-start; } .consultation-card-bottom { gap: 7px; } .consultation-chevron { display: none; } .consultation-facts { grid-template-columns: 1fr; } }

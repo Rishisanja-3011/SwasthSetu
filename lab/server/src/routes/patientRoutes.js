@@ -14,6 +14,8 @@ const {
   DiagnosticOrder,
   AuditEvent,
   AIArtifact,
+  ConsultationNote,
+  Notification,
 } = require('../models');
 const { requireAuth, requireRole } = require('../middleware/requireAuth');
 const { publicProvider, resolveProvider } = require('../services/providerService');
@@ -205,11 +207,17 @@ router.post('/lab-grants', async (req, res) => {
       return res.status(400).json({ success: false, error: 'LABORATORY_NOT_FOUND_OR_UNAPPROVED' });
     }
 
-    const orderId = req.body.diagnostic_order_id || null;
+    let orderId = req.body.diagnostic_order_id || null;
     if (orderId && (!isValidObjectId(orderId) || !await DiagnosticOrder.exists({
       _id: orderId, patient_id: patient._id, status: 'ORDERED',
     }))) {
       return res.status(400).json({ success: false, error: 'INVALID_DIAGNOSTIC_ORDER' });
+    }
+    if (!orderId) {
+      const latestOrder = await DiagnosticOrder.findOne({ patient_id: patient._id, status: 'ORDERED' })
+        .sort({ created_at: -1 })
+        .select('_id');
+      orderId = latestOrder?._id || null;
     }
 
     const existing = await LabAccessGrant.findOne({
@@ -247,10 +255,11 @@ router.post('/lab-grants', async (req, res) => {
         patient_id: patient._id,
         laboratory_id: provider.provider_id,
         laboratory_name: provider.provider.name,
-        laboratory_code: provider.provider_code,
-        shared_fields: grant.shared_fields,
-        status: grant.status,
-      },
+         laboratory_code: provider.provider_code,
+         shared_fields: grant.shared_fields,
+         status: grant.status,
+         diagnostic_order_id: grant.diagnostic_order_id,
+       },
     });
   } catch (error) {
     console.error('Patient lab grant error:', error);
@@ -263,52 +272,130 @@ router.get('/timeline', async (req, res) => {
     const patient = await getAuthenticatedPatient(req);
     if (!patient) return res.status(404).json({ success: false, error: 'PATIENT_PROFILE_NOT_FOUND' });
 
-    const [auditEvents, reports, encounters, grants] = await Promise.all([
-      AuditEvent.find({ patient_id: patient._id }).sort({ timestamp: -1 }).limit(100),
-      DiagnosticReport.find({ patient_id: patient._id, status: 'PUBLISHED' }).populate('laboratory_id'),
-      Encounter.find({ patient_id: patient._id }).populate('doctor_id'),
-      LabAccessGrant.find({ patient_id: patient._id }).populate('laboratory_id'),
+    const [encounters, intakes, notes, orders, reports] = await Promise.all([
+      Encounter.find({ patient_id: patient._id }).populate('doctor_id').sort({ created_at: -1 }),
+      SymptomIntake.find({ patient_id: patient._id }).sort({ created_at: -1 }),
+      ConsultationNote.find({ patient_id: patient._id }).sort({ created_at: -1 }),
+      DiagnosticOrder.find({ patient_id: patient._id }).populate('doctor_id').sort({ created_at: -1 }),
+      DiagnosticReport.find({ patient_id: patient._id, status: 'PUBLISHED' }).populate('laboratory_id').sort({ published_at: -1 }),
     ]);
 
-    const events = [
-      ...reports.map((report) => timelineEvent({
-        id: `report-${report._id}`,
-        type: 'REPORT_PUBLISHED',
-        title: 'CBC Report Published',
-        subtitle: report.laboratory_id?.name || 'Registered Laboratory',
-        timestamp: report.published_at || report.created_at,
-        badge: 'PUBLISHED',
-      })),
-      ...encounters.map((encounter) => timelineEvent({
-        id: `encounter-${encounter._id}`,
-        type: encounter.status === 'CLOSED' ? 'CONSULTATION_COMPLETED' : 'ENCOUNTER_CREATED',
-        title: encounter.status === 'CLOSED' ? 'Consultation Completed' : 'Consultation Opened',
-        subtitle: `${encounter.doctor_id?.name || 'Doctor'} • ${encounter.visit_type}`,
-        timestamp: encounter.ended_at || encounter.created_at,
-        badge: encounter.status,
-      })),
-      ...grants.map((grant) => timelineEvent({
-        id: `grant-${grant._id}`,
-        type: 'LAB_GRANT_APPROVED',
-        title: grant.status === 'ACTIVE' ? 'Laboratory Check-in Authorized' : 'Laboratory Access Completed',
-        subtitle: grant.laboratory_id?.name || 'Registered Laboratory',
-        timestamp: grant._id.getTimestamp(),
-        badge: grant.status,
-      })),
-      ...auditEvents.map((event) => timelineEvent({
-        id: `audit-${event._id}`,
-        type: event.action,
-        title: event.action.replaceAll('_', ' '),
-        subtitle: event.resource_type,
-        timestamp: event.timestamp,
-        badge: event.outcome,
-        details: event.details?.reason,
-      })),
-    ].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+    const intakesByEncounter = new Map(intakes.map((item) => [String(item.encounter_id), item]));
+    const notesByEncounter = new Map(notes.map((item) => [String(item.encounter_id), item]));
+    const ordersByEncounter = new Map();
+    orders.forEach((order) => {
+      const key = String(order.encounter_id);
+      if (!ordersByEncounter.has(key)) ordersByEncounter.set(key, []);
+      ordersByEncounter.get(key).push(order);
+    });
+    const reportsByOrder = new Map(reports.map((report) => [String(report.diagnostic_order_id), report]));
 
-    return res.json({ success: true, events });
+    const consultations = encounters.map((encounter) => {
+      const encounterId = String(encounter._id);
+      const intake = intakesByEncounter.get(encounterId);
+      const orderDetails = (ordersByEncounter.get(encounterId) || []).map((order) => {
+        const report = reportsByOrder.get(String(order._id));
+        return {
+          id: order._id,
+          test_type: order.test_type,
+          clinical_notes: order.clinical_notes,
+          status: order.status,
+          created_at: order.created_at,
+          report: report ? {
+            id: report._id,
+            status: report.status,
+            laboratory_name: report.laboratory_id?.name || 'Registered Laboratory',
+            published_at: report.published_at,
+          } : null,
+        };
+      });
+      return timelineEvent({
+        id: `consultation-${encounter._id}`,
+        type: 'CONSULTATION',
+        title: `${encounter.visit_type === 'REVISITING' ? 'Revisiting' : 'New'} consultation`,
+        subtitle: `${encounter.doctor_id?.name || 'Doctor'} • ${encounter.status === 'CLOSED' ? 'Completed' : 'Open'}`,
+        timestamp: encounter.created_at,
+        badge: encounter.status,
+        details: {
+          encounter_id: encounter._id,
+          visit_type: encounter.visit_type,
+          status: encounter.status,
+          created_at: encounter.created_at,
+          started_at: encounter.started_at,
+          ended_at: encounter.ended_at,
+          doctor: encounter.doctor_id ? {
+            id: encounter.doctor_id._id,
+            name: encounter.doctor_id.name,
+            specialty: encounter.doctor_id.specialty,
+            clinic_name: encounter.doctor_id.clinic_name,
+          } : null,
+          intake: intake ? {
+            created_at: intake.created_at,
+            input_mode: intake.input_mode,
+            transcript: intake.transcript,
+            chief_complaint: intake.chief_complaint,
+            duration: intake.duration,
+            symptoms: intake.symptoms,
+            structured_data: intake.structured_data,
+          } : null,
+          consultation_note: notesByEncounter.get(encounterId)?.notes_text || '',
+          diagnostic_orders: orderDetails,
+        },
+      });
+    });
+
+    return res.json({ success: true, consultations });
   } catch (error) {
     return res.status(500).json({ success: false, error: 'PATIENT_TIMELINE_FAILED' });
+  }
+});
+
+router.get('/notifications', async (req, res) => {
+  try {
+    const patient = await getAuthenticatedPatient(req);
+    if (!patient) return res.status(404).json({ success: false, error: 'PATIENT_PROFILE_NOT_FOUND' });
+    const filter = { patient_id: patient._id, type: 'DIAGNOSTIC_ORDER_CREATED' };
+    const notifications = await Notification.find(filter)
+      .populate('doctor_id', 'name specialty clinic_name')
+      .populate('diagnostic_order_id', 'test_type clinical_notes status created_at')
+      .sort({ created_at: -1 })
+      .limit(30);
+    return res.json({
+      success: true,
+      notifications,
+      unread_count: await Notification.countDocuments({ ...filter, read: false }),
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: 'PATIENT_NOTIFICATIONS_FAILED' });
+  }
+});
+
+router.post('/notifications/:notificationId/read', async (req, res) => {
+  try {
+    const patient = await getAuthenticatedPatient(req);
+    if (!patient || !isValidObjectId(req.params.notificationId)) {
+      return res.status(404).json({ success: false, error: 'NOTIFICATION_NOT_FOUND' });
+    }
+    const notification = await Notification.findOneAndUpdate(
+      { _id: req.params.notificationId, patient_id: patient._id, type: 'DIAGNOSTIC_ORDER_CREATED' },
+      { read: true },
+      { new: true },
+    );
+    if (!notification) return res.status(404).json({ success: false, error: 'NOTIFICATION_NOT_FOUND' });
+    return res.json({ success: true, notification });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: 'PATIENT_NOTIFICATION_UPDATE_FAILED' });
+  }
+});
+
+router.post('/notifications/read-all', async (req, res) => {
+  try {
+    const patient = await getAuthenticatedPatient(req);
+    if (!patient) return res.status(404).json({ success: false, error: 'PATIENT_PROFILE_NOT_FOUND' });
+    await Notification.updateMany({ patient_id: patient._id, type: 'DIAGNOSTIC_ORDER_CREATED', read: false }, { read: true });
+    return res.json({ success: true });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: 'PATIENT_NOTIFICATION_UPDATE_FAILED' });
   }
 });
 

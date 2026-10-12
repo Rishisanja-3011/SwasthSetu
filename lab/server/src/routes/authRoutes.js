@@ -113,6 +113,30 @@ async function createPatientAccount(phone, profile) {
   }
 }
 
+function publicLaboratory(laboratory) {
+  return {
+    id: laboratory._id,
+    _id: laboratory._id,
+    name: laboratory.name,
+    location: laboratory.location,
+    contact_phone: laboratory.contact_phone,
+    qr_code_id: laboratory.qr_code_id,
+    provider_code: laboratory.qr_code_id,
+  };
+}
+
+async function allocateLaboratoryCode() {
+  for (let attempt = 0; attempt < 30; attempt += 1) {
+    const candidate = `LAB-${crypto.randomInt(100000, 1000000)}`;
+    const [laboratoryExists, doctorExists] = await Promise.all([
+      Laboratory.exists({ qr_code_id: candidate }),
+      Doctor.exists({ qr_code_id: candidate }),
+    ]);
+    if (!laboratoryExists && !doctorExists) return candidate;
+  }
+  throw new Error('Could not allocate a unique laboratory ID.');
+}
+
 /**
  * Start patient OTP authentication. The OTP is deliberately printed only in
  * the local server terminal until an SMS adapter is selected.
@@ -316,6 +340,57 @@ router.post('/doctor/register', async (req, res) => {
     });
   } catch (error) {
     return res.status(400).json({ success: false, error: error.message || 'DOCTOR_REGISTRATION_FAILED' });
+  }
+});
+
+router.post('/laboratory/register', async (req, res) => {
+  try {
+    const name = typeof req.body.name === 'string' ? req.body.name.trim() : '';
+    const phone = normalizePhone(req.body.phone);
+    const location = typeof req.body.location === 'string' && req.body.location.trim()
+      ? req.body.location.trim().slice(0, 180)
+      : 'Location not provided';
+    if (!name || !phone) {
+      return res.status(400).json({ success: false, error: 'Laboratory name and registered phone are required.' });
+    }
+    if (await User.exists({ phone })) {
+      return res.status(409).json({ success: false, error: 'A user already exists for this phone number.' });
+    }
+
+    let user;
+    let laboratory;
+    for (let attempt = 0; attempt < 5 && !laboratory; attempt += 1) {
+      const laboratoryCode = await allocateLaboratoryCode();
+      user = await User.create({ role: 'LABORATORY', phone, name });
+      try {
+        laboratory = await Laboratory.create({
+          user_id: user._id,
+          name,
+          qr_code_id: laboratoryCode,
+          location,
+          contact_phone: phone,
+          // Self-registered facilities are active immediately; no admin approval
+          // step is part of the laboratory workflow.
+          platform_approval_status: 'APPROVED',
+        });
+      } catch (error) {
+        await User.findByIdAndDelete(user._id);
+        if (error.code !== 11000 || attempt === 4) throw error;
+      }
+    }
+    if (!laboratory || !user) throw new Error('Could not create the laboratory account.');
+    const token = issueToken({ subject: user._id, role: 'LABORATORY' });
+    return res.status(201).json({
+      success: true,
+      access_token: token,
+      laboratory: publicLaboratory(laboratory),
+    });
+  } catch (error) {
+    console.error('Laboratory registration error:', error);
+    return res.status(error.code === 11000 ? 409 : 400).json({
+      success: false,
+      error: error.code === 11000 ? 'LABORATORY_ID_COLLISION' : (error.message || 'LABORATORY_REGISTRATION_FAILED'),
+    });
   }
 });
 

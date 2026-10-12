@@ -28,11 +28,11 @@ const laboratorySchema = new mongoose.Schema({
   },
   location: {
     type: String,
-    default: 'District Diagnostic Center',
+    default: 'Location not provided',
   },
   contact_phone: {
     type: String,
-    default: '+91 98200 11223',
+    default: null,
   },
   created_at: {
     type: Date,

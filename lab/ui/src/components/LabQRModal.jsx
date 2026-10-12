@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { QrCode, UserPlus, RefreshCw, X, ShieldCheck, Printer, Check } from 'lucide-react';
+import { QRCodeSVG } from 'qrcode.react';
 
 export default function LabQRModal({
   isOpen,
@@ -87,50 +88,20 @@ export default function LabQRModal({
               VaaniDoc 2.0 Registered Laboratory
             </div>
             <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#0f172a', margin: '0.35rem 0' }}>
-              {lab?.name || 'Lifeline Diagnostic Centre'}
+              {lab?.name || 'Laboratory'}
             </h2>
             <p style={{ fontSize: '0.8rem', color: '#64748b' }}>
               Patients: Scan this QR code with your camera or VaaniDoc app to grant 4-field identity access.
             </p>
 
             <div className="qr-matrix-box">
-              {/* SVG Visual Representation of QR */}
-              <svg width="130" height="130" viewBox="0 0 100 100" fill="#0f172a">
-                <rect width="100" height="100" fill="#f8fafc" />
-                {/* Corner squares */}
-                <rect x="10" y="10" width="25" height="25" fill="#0284c7" />
-                <rect x="15" y="15" width="15" height="15" fill="#f8fafc" />
-                <rect x="18" y="18" width="9" height="9" fill="#0284c7" />
-
-                <rect x="65" y="10" width="25" height="25" fill="#0284c7" />
-                <rect x="70" y="15" width="15" height="15" fill="#f8fafc" />
-                <rect x="73" y="18" width="9" height="9" fill="#0284c7" />
-
-                <rect x="10" y="65" width="25" height="25" fill="#0284c7" />
-                <rect x="15" y="70" width="15" height="15" fill="#f8fafc" />
-                <rect x="18" y="73" width="9" height="9" fill="#0284c7" />
-
-                {/* Data modules */}
-                <rect x="42" y="12" width="6" height="6" />
-                <rect x="52" y="18" width="6" height="6" />
-                <rect x="42" y="28" width="6" height="6" />
-                <rect x="48" y="38" width="6" height="6" />
-                <rect x="12" y="48" width="6" height="6" />
-                <rect x="22" y="52" width="6" height="6" />
-                <rect x="32" y="42" width="6" height="6" />
-                <rect x="68" y="48" width="6" height="6" />
-                <rect x="78" y="58" width="6" height="6" />
-                <rect x="42" y="68" width="6" height="6" />
-                <rect x="52" y="78" width="6" height="6" />
-                <rect x="62" y="82" width="6" height="6" />
-                <rect x="82" y="78" width="6" height="6" />
-              </svg>
+              <QRCodeSVG value={lab?.qr_code_id || 'LABORATORY_ID_UNAVAILABLE'} size={130} bgColor="#f8fafc" fgColor="#0f172a" level="M" includeMargin />
 
               <div style={{ marginTop: '0.75rem' }}>
-                <span className="qr-code-pill">{lab?.qr_code_id || 'LAB-808'}</span>
+                <span className="qr-code-pill">{lab?.qr_code_id || 'ID unavailable'}</span>
               </div>
               <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '0.4rem' }}>
-                Fallback Code: <strong>{lab?.qr_code_id || 'LAB-808'}</strong>
+                Patient scan code: <strong>{lab?.qr_code_id || 'ID unavailable'}</strong>
               </div>
             </div>
           </div>

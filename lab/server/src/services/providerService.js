@@ -21,7 +21,7 @@ async function resolveProvider(code) {
 
   const laboratory = await Laboratory.findOne({
     qr_code_id: providerCode,
-    platform_approval_status: 'APPROVED',
+    platform_approval_status: { $ne: 'REVOKED' },
   });
   if (laboratory) {
     return {
@@ -56,6 +56,7 @@ function publicProvider(providerMatch) {
     provider_code,
     name: provider.name,
     location: provider.location,
+    contact_phone: provider.contact_phone,
   };
 }
 
