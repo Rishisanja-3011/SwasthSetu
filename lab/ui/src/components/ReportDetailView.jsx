@@ -7,7 +7,6 @@ import {
   ShieldAlert,
   ArrowRight,
   ArrowLeft,
-  RotateCcw,
   Edit3,
   Lock,
   Send,
@@ -30,7 +29,6 @@ export default function ReportDetailView({
   onUpdateObservation,
   onPublishReport,
   onBackToDashboard,
-  onResetDemo,
   activeStaff,
 }) {
   // Local state for Observation Edit Modal
@@ -49,15 +47,12 @@ export default function ReportDetailView({
   );
 
   // File upload state for unextracted visits
-  const [selectedFile, setSelectedFile] = useState({
-    name: 'CBC_Report_Rahul_Sharma.pdf',
-    size: '184 KB',
-  });
-  const [triggerDemoReview, setTriggerDemoReview] = useState(false);
+  const [selectedFile, setSelectedFile] = useState(null);
 
   const hasNeedsReview = observations?.some((o) => o.validation_status === 'NEEDS_REVIEW');
   const unresolvedCount = observations?.filter((o) => o.validation_status === 'NEEDS_REVIEW').length || 0;
   const isPublished = report?.status === 'PUBLISHED';
+  const isExtractionPending = report && !['PROCESSING', 'NEEDS_REVIEW', 'PUBLISHED'].includes(report.status);
 
   // Open edit modal
   const handleStartEdit = (obs) => {
@@ -109,8 +104,8 @@ export default function ReportDetailView({
 
   const handleUploadSubmit = () => {
     onUploadReport({
-      fileName: selectedFile?.name || 'CBC_Report_Rahul_Sharma.pdf',
-      caseType: triggerDemoReview ? 'needs_review_demo' : 'standard',
+      fileName: selectedFile?.name,
+      rawFile: selectedFile?.rawFile,
     });
   };
 
@@ -152,7 +147,7 @@ export default function ReportDetailView({
           <div className="identity-cards-grid">
             <div className="identity-field-card">
               <div className="label">Patient Name</div>
-              <div className="val">{patient?.name || 'Rahul Sharma'}</div>
+              <div className="val">{patient?.name || 'Identity unavailable'}</div>
             </div>
             <div className="identity-field-card">
               <div className="label">Age & Gender</div>
@@ -164,7 +159,7 @@ export default function ReportDetailView({
             </div>
             <div className="identity-field-card">
               <div className="label">Ordering Physician</div>
-              <div className="val">Dr. Ramesh Mehta</div>
+              <div className="val">{order?.ordering_doctor || order?.doctor_id?.name || 'Registered Doctor'}</div>
             </div>
           </div>
         </div>
@@ -248,7 +243,7 @@ export default function ReportDetailView({
                 </div>
 
                 <div style={{ fontSize: '0.92rem', fontWeight: 700, color: 'var(--text-main)', fontFamily: 'var(--font-mono)' }}>
-                  {selectedFile?.name || 'CBC_Report_Rahul_Sharma.pdf'}
+                  {selectedFile?.name || 'No PDF selected'}
                 </div>
 
                 <div style={{ display: 'inline-block', marginTop: '0.5rem' }}>
@@ -258,34 +253,8 @@ export default function ReportDetailView({
                 </div>
 
                 <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.5rem' }}>
-                  Original laboratory generated blood report ({selectedFile?.size || '184 KB'})
+                  Original laboratory generated blood report ({selectedFile?.size || 'Select a PDF to continue'})
                 </div>
-              </div>
-
-              {/* Optional Demo Discrepancy Toggle */}
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.5rem',
-                  marginBottom: '1.25rem',
-                  padding: '0.65rem 0.85rem',
-                  background: 'var(--bg-page)',
-                  borderRadius: 'var(--radius-md)',
-                  fontSize: '0.8rem',
-                  color: 'var(--text-secondary)',
-                }}
-              >
-                <input
-                  type="checkbox"
-                  id="toggle-discrepancy-reports"
-                  checked={triggerDemoReview}
-                  onChange={(e) => setTriggerDemoReview(e.target.checked)}
-                  style={{ cursor: 'pointer' }}
-                />
-                <label htmlFor="toggle-discrepancy-reports" style={{ cursor: 'pointer' }}>
-                  Simulate extraction discrepancy / low-confidence value (Triggers <code>NEEDS_REVIEW</code> to test Pathologist review)
-                </label>
               </div>
 
               {/* Upload Button */}
@@ -293,6 +262,7 @@ export default function ReportDetailView({
                 <button
                   className="btn-clinical primary"
                   onClick={handleUploadSubmit}
+                  disabled={!selectedFile?.rawFile}
                   style={{ padding: '0.65rem 1.5rem', fontSize: '0.88rem' }}
                 >
                   <UploadCloud size={16} />
@@ -327,7 +297,7 @@ export default function ReportDetailView({
             {isPublished ? 'Published Report' : 'Extraction Review'}
           </h2>
           <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-            Complete Blood Count (CBC) · Patient: {patient?.name || report?.patient_id?.name || 'Rahul Sharma'}
+            Complete Blood Count (CBC) · Patient: {patient?.name || report?.patient_id?.name || 'Identity unavailable'}
           </p>
         </div>
 
@@ -444,6 +414,8 @@ export default function ReportDetailView({
               <span className="badge-pill normal">
                 <Lock size={12} /> Published
               </span>
+            ) : isExtractionPending ? (
+              <span className="badge-pill low">Extraction Pending</span>
             ) : hasNeedsReview ? (
               <span className="badge-pill review">
                 <AlertTriangle size={12} /> {unresolvedCount} Needs Review
@@ -565,19 +537,21 @@ export default function ReportDetailView({
 
           <div style={{ display: 'flex', gap: '0.75rem' }}>
             {isPublished ? (
-              <button className="btn-clinical outline" onClick={onResetDemo}>
-                <RotateCcw size={14} />
-                <span>Reset Demo Iteration</span>
-              </button>
+              <span className="badge-pill normal">Report Published and Locked</span>
             ) : (
               <button
                 className="btn-clinical primary"
-                disabled={hasNeedsReview || isPublishing}
+                disabled={hasNeedsReview || isExtractionPending || isPublishing}
                 onClick={() => setIsPublishModalOpen(true)}
                 title={hasNeedsReview ? 'Resolve all flagged items before publication' : 'Publish report to VaaniDoc'}
                 style={{ padding: '0.65rem 1.4rem' }}
               >
-                {hasNeedsReview ? (
+                {isExtractionPending ? (
+                  <>
+                    <Clock size={15} />
+                    <span>Extraction Pending</span>
+                  </>
+                ) : hasNeedsReview ? (
                   <>
                     <Lock size={15} />
                     <span>Publishing Disabled (Resolve Flagged)</span>

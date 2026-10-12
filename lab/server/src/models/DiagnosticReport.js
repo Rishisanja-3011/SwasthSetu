@@ -50,6 +50,16 @@ const diagnosticReportSchema = new mongoose.Schema({
     type: Date,
     default: null,
   },
+  lab_access_grant_id: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'LabAccessGrant',
+    unique: true,
+    sparse: true,
+  },
+  workflow_revision: {
+    type: Number,
+    default: 0,
+  },
 });
 
 diagnosticReportSchema.index({ patient_id: 1, status: 1, published_at: -1 });

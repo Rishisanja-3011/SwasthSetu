@@ -35,6 +35,9 @@ legacy reference and is not modified by this project.
 - Pending QR destinations are single-use and have their own TTL index.
 - Original PDF metadata is separate from structured observations so the source
   file remains preservable and independently downloadable.
+- Original PDF bytes are stored at runtime under `lab/server/storage/` (or the
+  `REPORT_STORAGE_ROOT` environment override). The directory is ignored by git;
+  MongoDB stores only its immutable storage key and hash.
 - AI artifacts must reference an encounter or report source.
 
 ## Initialize a local or Atlas database
@@ -65,3 +68,12 @@ replaceable later with an SMS adapter.
 Provider metadata can be resolved without authentication through
 `GET /api/providers/resolve/:providerCode`. It returns only public provider
 metadata and never patient history.
+
+For local approved laboratory onboarding, use the backend-only helper:
+
+```text
+node scripts/onboardLaboratory.js --name "Laboratory name" --phone "+919000000002" --code "LAB-102" --location "City"
+```
+
+The laboratory UI then signs in through `/api/auth/provider/login` with the
+registered phone and provider code.

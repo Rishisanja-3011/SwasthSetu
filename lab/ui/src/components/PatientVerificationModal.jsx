@@ -9,7 +9,7 @@ export default function PatientVerificationModal({
 }) {
   if (!isOpen || !identityData) return null;
 
-  const { identity, order, grant_status, expires_at } = identityData;
+  const { identity, order } = identityData;
 
   return (
     <div className="modal-overlay">
@@ -71,7 +71,7 @@ export default function PatientVerificationModal({
             </div>
             <div className="identity-field">
               <div className="label">Age / Date of Birth</div>
-              <div className="value">{identity?.age} yrs ({identity?.date_of_birth})</div>
+              <div className="value">{identity?.date_of_birth || (identity?.age ? `${identity.age} yrs` : 'Unavailable')}</div>
             </div>
             <div className="identity-field">
               <div className="label">Gender</div>

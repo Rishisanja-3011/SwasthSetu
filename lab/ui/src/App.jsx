@@ -15,16 +15,26 @@ const DEFAULT_STAFF = {
   license: 'MED-PATH-9021',
 };
 
+function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
 export default function App() {
   // Navigation & Authentication State
-  const [isLoggedIn, setIsLoggedIn] = useState(true);
+  const [accessToken, setAccessToken] = useState(() => localStorage.getItem('vaanidoc_lab_access_token') || '');
+  const [isLoggedIn, setIsLoggedIn] = useState(() => Boolean(localStorage.getItem('vaanidoc_lab_access_token')));
   const [currentView, setCurrentView] = useState('dashboard'); // 'dashboard' | 'patient_visit' | 'reports'
 
   // Lab & Dashboard Data
   const [lab, setLab] = useState(null);
-  const [activeStaff, setActiveStaff] = useState(DEFAULT_STAFF);
+  const [activeStaff] = useState(DEFAULT_STAFF);
   const [metrics, setMetrics] = useState({
-    activeGrantsCount: 1,
+    activeGrantsCount: 0,
     processingCount: 0,
     needsReviewCount: 0,
     publishedCount: 0,
@@ -46,6 +56,15 @@ export default function App() {
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [notification, setNotification] = useState(null);
 
+  const apiFetch = (url, options = {}) => fetch(url, {
+    ...options,
+    headers: {
+      ...(options.body instanceof FormData ? {} : { 'Content-Type': 'application/json' }),
+      ...(options.headers || {}),
+      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+    },
+  });
+
   const showNotification = (msg, type = 'teal') => {
     setNotification({ msg, type });
     setTimeout(() => setNotification(null), 5000);
@@ -53,14 +72,15 @@ export default function App() {
 
   // Load Initial Lab & Dashboard Data
   const loadDashboard = async () => {
+    if (!accessToken) return;
     try {
-      const listRes = await fetch('/api/lab/list');
+      const listRes = await apiFetch('/api/lab/list');
       const listData = await listRes.json();
       if (listData.success && listData.laboratories.length > 0) {
         const activeLab = listData.laboratories[0];
         setLab(activeLab);
 
-        const dashRes = await fetch(`/api/lab/dashboard/${activeLab._id}`);
+      const dashRes = await apiFetch(`/api/lab/dashboard/${activeLab._id}`);
         const dashData = await dashRes.json();
         if (dashData.success) {
           setMetrics(dashData.metrics);
@@ -88,7 +108,7 @@ export default function App() {
     // 1. Fetch patient identity if grant is active
     if (grant.grant_status === 'ACTIVE') {
       try {
-        const res = await fetch(`/api/lab/grant/${grantId}/patient-identity`);
+        const res = await apiFetch(`/api/lab/grant/${grantId}/patient-identity`);
         const data = await res.json();
         if (data.success) {
           setIdentityData(data);
@@ -109,12 +129,14 @@ export default function App() {
 
       if (reportId) {
         matchedReport = reportsList.find((r) => r._id === reportId);
+      } else if (grant.report_id) {
+        matchedReport = reportsList.find((r) => String(r._id) === String(grant.report_id));
       } else if (grant.patient?.name) {
         matchedReport = reportsList.find((r) => r.patient_id?.name === grant.patient?.name || r.patient_id === grant.patient?.id);
       }
 
       if (matchedReport) {
-        const repRes = await fetch(`/api/lab/report/${matchedReport._id}`);
+        const repRes = await apiFetch(`/api/lab/report/${matchedReport._id}`);
         const repData = await repRes.json();
         if (repData.success) {
           setCurrentReport(repData.report);
@@ -135,7 +157,29 @@ export default function App() {
 
   useEffect(() => {
     loadDashboard();
-  }, []);
+  }, [accessToken]);
+
+  const handleLabLogin = async ({ labCode, phone }) => {
+    const response = await fetch('/api/auth/provider/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ provider_code: labCode, provider_type: 'LABORATORY', phone }),
+    });
+    const data = await response.json();
+    if (!response.ok || !data.success) {
+      throw new Error(data.message || data.error || 'Laboratory sign-in failed.');
+    }
+    localStorage.setItem('vaanidoc_lab_access_token', data.access_token);
+    setAccessToken(data.access_token);
+    setLab({
+      _id: data.provider.provider_id,
+      name: data.provider.name,
+      qr_code_id: data.provider.provider_code,
+      location: data.provider.location,
+    });
+    setIsLoggedIn(true);
+    setCurrentView('dashboard');
+  };
 
   // Action: Open a visit from the Dashboard Worklist
   const handleOpenPatientVisit = async (grant) => {
@@ -152,20 +196,21 @@ export default function App() {
   };
 
   // Action: Upload Generated Blood Report & Run CBC Extraction Engine
-  const handleUploadReport = async ({ fileName, caseType = 'standard', rawText = null }) => {
+  const handleUploadReport = async ({ fileName, rawText = null, rawFile = null }) => {
     if (!selectedGrant) return;
     setIsProcessing(true);
 
     try {
       const grantId = selectedGrant.grant_id || selectedGrant._id;
-      const res = await fetch('/api/lab/generate-report', {
+      const fileBase64 = rawFile ? await fileToBase64(rawFile) : null;
+      const res = await apiFetch('/api/lab/generate-report', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           grant_id: grantId,
-          case_type: caseType,
           file_name: fileName || 'CBC_Report_Rahul_Sharma.pdf',
-          raw_text: rawText,
+          raw_text: rawText || '',
+          file_base64: fileBase64,
+          file_mime_type: rawFile?.type || 'application/pdf',
           technician: activeStaff,
         }),
       });
@@ -175,7 +220,9 @@ export default function App() {
         setCurrentReport(data.report);
         setObservations(data.observations || []);
 
-        if (data.needs_review) {
+        if (data.extraction_pending) {
+          showNotification('Original PDF stored securely. CBC extraction is pending the configured extraction service.', 'warning');
+        } else if (data.needs_review) {
           showNotification('CBC Extracted: One or more parameters require pathologist review before publication.', 'warning');
         } else {
           showNotification('Report Uploaded & Extracted: CBC observations validated and ready for review.', 'teal');
@@ -197,9 +244,8 @@ export default function App() {
   // Action: Update & deterministically revalidate an extracted observation (Screen #5)
   const handleUpdateObservation = async (obsId, updatedFields) => {
     try {
-      const res = await fetch(`/api/lab/observation/${obsId}`, {
+      const res = await apiFetch(`/api/lab/observation/${obsId}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...updatedFields,
           technician: activeStaff,
@@ -236,9 +282,8 @@ export default function App() {
 
     try {
       const grantId = selectedGrant?.grant_id || selectedGrant?._id;
-      const res = await fetch(`/api/lab/report/${currentReport._id}/publish`, {
+      const res = await apiFetch(`/api/lab/report/${currentReport._id}/publish`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           grant_id: grantId,
           technician: activeStaff,
@@ -253,7 +298,10 @@ export default function App() {
           setSelectedGrant((prev) => ({
             ...prev,
             grant_status: 'EXPIRED',
+            patient: null,
+            diagnostic_order: null,
           }));
+          setIdentityData(null);
         }
         showNotification('Report published successfully! Bounded access expired automatically.', 'teal');
         await loadDashboard();
@@ -267,25 +315,6 @@ export default function App() {
     }
   };
 
-  // Action: Reset Demo environment
-  const handleResetDemo = async () => {
-    try {
-      const res = await fetch('/api/seed/reset', { method: 'POST' });
-      const data = await res.json();
-      if (data.success) {
-        showNotification('Demo environment reset successfully! Rahul Sharma CBC order active.', 'teal');
-        setCurrentReport(null);
-        setObservations([]);
-        setSelectedGrant(null);
-        setIdentityData(null);
-        setCurrentView('dashboard');
-        await loadDashboard();
-      }
-    } catch (err) {
-      showNotification('Failed to reset demo.', 'warning');
-    }
-  };
-
   // Derive Current Access Status:
   // ACTIVE if the selected grant is ACTIVE and its report is not published
   const isAccessActive = selectedGrant?.grant_status === 'ACTIVE' && currentReport?.status !== 'PUBLISHED';
@@ -296,11 +325,7 @@ export default function App() {
     return (
       <LabLoginView
         lab={lab}
-        onLogin={(staff) => {
-          setActiveStaff((prev) => ({ ...prev, ...staff }));
-          setIsLoggedIn(true);
-          setCurrentView('dashboard');
-        }}
+        onLogin={handleLabLogin}
       />
     );
   }
@@ -309,9 +334,8 @@ export default function App() {
     <div className="app-shell">
       {/* Top Navigation Bar */}
       <LabNavbar
-        lab={lab}
-        accessStatus={accessStatus}
-        onResetDemo={handleResetDemo}
+          lab={lab}
+          accessStatus={accessStatus}
       />
 
       <div className="shell-body">
@@ -320,7 +344,11 @@ export default function App() {
           currentView={currentView}
           onNavigate={(view) => setCurrentView(view)}
           onOpenProfile={() => setIsProfileModalOpen(true)}
-          onLogout={() => setIsLoggedIn(false)}
+           onLogout={() => {
+             localStorage.removeItem('vaanidoc_lab_access_token');
+             setAccessToken('');
+             setIsLoggedIn(false);
+           }}
           counts={{
             pendingVisits: metrics?.activeGrantsCount || 0,
             needsReview: metrics?.needsReviewCount || 0,
@@ -361,7 +389,7 @@ export default function App() {
             <ReportDetailView
               report={currentReport}
               observations={observations}
-              patient={selectedGrant?.patient || identityData?.identity || { name: 'Rahul Sharma' }}
+               patient={selectedGrant?.patient || identityData?.identity || {}}
               order={selectedGrant?.diagnostic_order || identityData?.order}
               grantStatus={accessStatus}
               isProcessing={isProcessing}
@@ -370,7 +398,6 @@ export default function App() {
               onUpdateObservation={handleUpdateObservation}
               onPublishReport={handlePublishReport}
               onBackToDashboard={() => setCurrentView('dashboard')}
-              onResetDemo={handleResetDemo}
               activeStaff={activeStaff}
             />
           )}

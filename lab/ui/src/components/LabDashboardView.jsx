@@ -129,7 +129,7 @@ export default function LabDashboardView({
                         </span>
                       </td>
                       <td style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
-                        Dr. Ramesh Mehta
+                        {item.diagnostic_order?.doctor_id?.name || 'Registered Doctor'}
                       </td>
                       <td>
                         {isActive ? (

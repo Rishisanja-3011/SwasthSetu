@@ -17,6 +17,7 @@ const {
 } = require('../models');
 const { requireAuth, requireRole } = require('../middleware/requireAuth');
 const { publicProvider, resolveProvider } = require('../services/providerService');
+const { downloadOriginalPdf } = require('../services/reportFiles');
 
 const router = express.Router();
 
@@ -68,6 +69,8 @@ async function toReportResponse(report) {
     created_at: report.created_at,
     published_at: report.published_at,
     original_file_name: file?.original_file_name || report.original_file_name,
+    original_file_available: Boolean(file),
+    original_file_url: file ? `/api/patient/reports/${report._id}/original` : null,
     report_hash: file?.sha256 || report.report_hash,
     observations: observations.map((observation) => ({
       _id: observation._id,
@@ -142,6 +145,29 @@ router.get('/reports/:reportId', async (req, res) => {
   }
 });
 
+router.get('/reports/:reportId/original', async (req, res) => {
+  try {
+    const patient = await getAuthenticatedPatient(req);
+    if (!patient || !isValidObjectId(req.params.reportId)) {
+      return res.status(404).json({ success: false, error: 'PUBLISHED_REPORT_NOT_FOUND' });
+    }
+    const report = await DiagnosticReport.findOne({
+      _id: req.params.reportId,
+      patient_id: patient._id,
+      status: 'PUBLISHED',
+    });
+    const originalFile = report ? await ReportFile.findOne({ report_id: report._id }) : null;
+    if (!report || !originalFile) {
+      return res.status(404).json({ success: false, error: 'ORIGINAL_REPORT_FILE_NOT_FOUND' });
+    }
+
+    return downloadOriginalPdf(res, originalFile);
+  } catch (error) {
+    console.error('Patient original report download error:', error);
+    return res.status(500).json({ success: false, error: 'ORIGINAL_REPORT_DOWNLOAD_FAILED' });
+  }
+});
+
 router.get('/lab-grants', async (req, res) => {
   try {
     const patient = await getAuthenticatedPatient(req);
@@ -179,6 +205,13 @@ router.post('/lab-grants', async (req, res) => {
       return res.status(400).json({ success: false, error: 'LABORATORY_NOT_FOUND_OR_UNAPPROVED' });
     }
 
+    const orderId = req.body.diagnostic_order_id || null;
+    if (orderId && (!isValidObjectId(orderId) || !await DiagnosticOrder.exists({
+      _id: orderId, patient_id: patient._id, status: 'ORDERED',
+    }))) {
+      return res.status(400).json({ success: false, error: 'INVALID_DIAGNOSTIC_ORDER' });
+    }
+
     const existing = await LabAccessGrant.findOne({
       patient_id: patient._id,
       laboratory_id: provider.provider_id,
@@ -191,7 +224,7 @@ router.post('/lab-grants', async (req, res) => {
     const grant = await LabAccessGrant.create({
       patient_id: patient._id,
       laboratory_id: provider.provider_id,
-      diagnostic_order_id: req.body.diagnostic_order_id || null,
+      diagnostic_order_id: orderId,
       shared_fields: ['name', 'date_of_birth', 'gender', 'phone'],
       status: 'ACTIVE',
     });

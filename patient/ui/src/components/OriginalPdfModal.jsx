@@ -1,45 +1,30 @@
 import React from 'react';
-import { X, Download, ShieldCheck, FileText, CheckCircle2, Building2 } from 'lucide-react';
+import { X, Download, ShieldCheck } from 'lucide-react';
+import { patientApi } from '../services/patientApi';
 
 export function OriginalPdfModal({ report, isOpen, onClose }) {
   if (!isOpen || !report) return null;
 
-  const handleDownload = () => {
-    // Generate text/file download representation of the preserved document
-    const content = `================================================================================
-           LIFELINE DIAGNOSTIC CENTRE - ACCREDITED PATHOLOGY WING
-           CENTRAL AUTOMATED HAEMATOLOGY LABORATORY REPORT
-================================================================================
-PATIENT NAME    : ${report.patient_name || 'Rahul Sharma'}
-PATIENT ID      : ${report.patient_identifier || 'PT-2026-4401'}
-ORDERING DOCTOR : ${report.ordering_doctor || 'Dr. Ramesh Mehta (DOC-409)'}
-LABORATORY      : ${report.laboratory_name || 'Lifeline Diagnostic Centre (LAB-808)'}
-SAMPLE DATE     : ${new Date(report.created_at).toLocaleDateString()}
-STATUS          : PUBLISHED & CRYPTOGRAPHICALLY PRESERVED
-SHA-256 HASH    : ${report.report_hash || 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855'}
---------------------------------------------------------------------------------
-TEST PARAMETER              RESULT       UNIT       REFERENCE RANGE   STATUS
---------------------------------------------------------------------------------
-${(report.observations || [])
-  .map(
-    (o) =>
-      `${(o.test_name_normalized || o.test_name_original).padEnd(26)} ${String(o.value).padEnd(10)} ${(o.unit || '').padEnd(10)} ${(o.reference_low !== null ? `${o.reference_low}-${o.reference_high}` : 'N/A').padEnd(17)} [${o.flag}]`
-  )
-  .join('\n')}
---------------------------------------------------------------------------------
-PATHOLOGIST SIGN-OFF: Dr. Shalini Gupta, MBBS, MD Pathology (Verified)
-DISCLAIMER: This original laboratory document has been preserved without alteration.
-================================================================================`;
+  const handleDownload = async () => {
+    if (report.original_file_available) {
+      try {
+        const blob = await patientApi.downloadOriginalReport(report._id);
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = report.original_file_name || 'Original_Preserved_Report.pdf';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        return;
+      } catch (error) {
+        window.alert('The original laboratory PDF is not available right now.');
+        return;
+      }
+    }
 
-    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = report.original_file_name || 'Original_Preserved_Report.txt';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+    window.alert('The original laboratory PDF is not available for this report.');
   };
 
   return (
@@ -78,12 +63,12 @@ DISCLAIMER: This original laboratory document has been preserved without alterat
               SHA-256 Preservation Verification Verified
             </div>
             <div style={{ fontSize: '0.7rem', fontFamily: 'var(--font-mono)', color: '#047857', wordBreak: 'break-all' }}>
-              {report.report_hash || 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855'}
+              {report.report_hash || 'Not available'}
             </div>
           </div>
         </div>
 
-        {/* Simulated High-Fidelity Original PDF Canvas */}
+        {/* Report metadata preview; the immutable source PDF is downloaded below. */}
         <div style={{
           backgroundColor: '#f8fafc',
           border: '1px solid var(--border-medium)',
@@ -159,7 +144,7 @@ DISCLAIMER: This original laboratory document has been preserved without alterat
             style={{ flex: 2 }}
           >
             <Download size={16} />
-            Download Original Report
+            Download Original PDF
           </button>
         </div>
       </div>

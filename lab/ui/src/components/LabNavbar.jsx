@@ -1,10 +1,9 @@
 import React from 'react';
-import { Activity, ShieldCheck, ShieldAlert, RotateCcw, Building2 } from 'lucide-react';
+import { Activity, ShieldCheck, ShieldAlert, Building2 } from 'lucide-react';
 
 export default function LabNavbar({
   lab,
   accessStatus,
-  onResetDemo,
 }) {
   const isAccessActive = accessStatus === 'ACTIVE';
 
@@ -48,16 +47,6 @@ export default function LabNavbar({
           </div>
         )}
 
-        {/* Reset Demo button for quick iterative testing */}
-        <button
-          className="btn-clinical outline"
-          style={{ padding: '0.35rem 0.75rem', fontSize: '0.78rem' }}
-          onClick={onResetDemo}
-          title="Reset demo data to Rahul Sharma CBC order"
-        >
-          <RotateCcw size={14} />
-          <span>Reset Demo</span>
-        </button>
       </div>
     </header>
   );

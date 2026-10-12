@@ -266,6 +266,7 @@ export const ClinicalCockpitScreen = () => {
   const patient = cockpitData?.patient;
   const intake = cockpitData?.intake;
   const priorNotes = cockpitData?.prior_notes || [];
+  const priorIntakes = cockpitData?.prior_intakes || [];
   const publishedReports = cockpitData?.published_reports || [];
   const currentOrders = cockpitData?.current_orders || [];
 
@@ -385,6 +386,7 @@ export const ClinicalCockpitScreen = () => {
       {isRevisiting && (
         <RevisitingHistorySection
           priorNotes={priorNotes}
+          priorIntakes={priorIntakes}
           publishedReports={publishedReports}
           doctorName={doctor?.name || 'Dr. Ramesh Mehta'}
         />

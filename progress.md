@@ -1,7 +1,7 @@
 # SwasthSetu / VaaniDoc Progress
 
-**Last updated:** 2026-10-11  
-**Stopping point:** Patient authentication and patient UI backend integration are implemented. The Patient 2.0 Assistant and floating MediBot presentation, styles, and avatar asset are now copied into `patient/ui` while canonical patient APIs remain in control. The attached MediBot FastAPI backend is integrated under `patient/backend`; live Atlas patient authentication remains the next verification step.
+**Last updated:** 2026-10-12  
+**Stopping point:** Patient, MediBot, doctor, and laboratory security/storage integrations are implemented locally. The doctor cockpit now includes original intake, structured intake placeholders, previous same-doctor structured intake, notes, and reports. The future multilingual extraction specification is documented in `pipeline.md`; live Windows patient-to-doctor/laboratory verification and extraction-service integration remain next.
 
 ## Project rules and decisions
 
@@ -17,7 +17,7 @@
   - An SMS adapter can be added later.
 - Atlas network access decision: use `0.0.0.0/0` for this college-project development environment so changing networks does not require changing the Atlas allowlist.
 - Laboratory grants do not use time-based expiry. They become `EXPIRED` when the associated report is published.
-- `775dacb` is pushed to `origin/main`. The patient UI/backend integration is committed locally as `19f2f92`; this new commit has not been pushed by the assistant.
+- `775dacb` is pushed to `origin/main`. Local commits `19f2f92`, `b5073ab`, `492d942`, and `8b07862` are ahead of `origin/main` and have not been pushed by the assistant.
 
 ## Completed database foundation
 
@@ -288,17 +288,62 @@ fallback login and simulated queue check-in controls were removed. The doctor
 UI build and backend syntax checks pass; a real doctor registration/login and
 patient-to-doctor queue test still needs to be run from Windows against Atlas.
 
+The doctor cockpit now also shows:
+
+- a stacked Original Patient Intake block with transcript, input mode, language,
+  session time, and audio status;
+- a Structured Clinical Intake block with chief complaint, duration, possible
+  symptom category, symptoms, allergies, history, medications, confidence, and
+  blank placeholders for fields not extracted yet;
+- previous same-doctor structured intake records during Revisiting, alongside
+  the existing doctor notes and published-report view.
+
+No extraction logic was added in this change. The future implementation prompt
+and legacy-reference plan are documented in `pipeline.md`.
+
 ### 4. Refactor the laboratory backend routes
 
-`lab/server/src/routes/labRoutes.js` still contains old demo behavior:
+The laboratory boundary has now been partially migrated:
 
-- time-based `expires_at` assumptions for lab grants;
-- unauthenticated laboratory actions;
-- simulated report generation;
-- JSON `raw_text` ingestion instead of real original PDF metadata/storage;
-- patient-view endpoints that need authenticated ownership/publication checks.
+- laboratory operator routes require an authenticated approved `LABORATORY`
+  session and load the owned laboratory profile;
+- dashboard, grants, reports, observations, publication, audit events, and
+  original-file access are restricted to the signed-in laboratory;
+- laboratory access grants are status-only and expire only when their report is
+  published;
+- patient identity exposure is limited to name, date of birth, gender, and
+  phone;
+- the old simulated patient-grant endpoint is disabled;
+- uploaded original PDF bytes are stored under `lab/server/storage/report-files`
+  with immutable `ReportFile` metadata and SHA-256 integrity data;
+- the lab UI now signs in through `/api/auth/provider/login`, keeps a bearer
+  session, removes Reset Demo controls, and sends the original PDF metadata to
+  the backend;
+- approved laboratory onboarding is available through the backend-only
+  `lab/server/scripts/onboardLaboratory.js` helper;
+- patient original-report downloads now use an authenticated backend file route
+  when a preserved PDF exists.
 
-It must be updated to use publication-only grant expiry, laboratory role sessions, report ownership, the original PDF flow, and the Python extraction pipeline where appropriate.
+Remaining laboratory work includes:
+
+- connect a real PDF/text extraction service. The upload endpoint now stores the
+  original PDF as `UPLOADED` and waits for the extraction worker; it has no
+  generated-report fallback;
+- finish the laboratory staff identity/sign-off model;
+- run the full patient → lab → published-report workflow against Atlas;
+- remove or replace remaining unused legacy/demo lab components.
+
+The current implementation uses publication-only grant expiry, laboratory role
+sessions, report ownership, original PDF storage, and the existing deterministic
+CBC validation engine while the extraction service remains pending.
+
+Focused verification now passes:
+
+- Node syntax checks for the laboratory middleware, routes, models, file service,
+  onboarding helper, patient routes, doctor routes, and server;
+- publication-only grant/model and route-boundary regression checks;
+- original PDF encoding, MIME, traversal, size, and `%PDF-` signature checks;
+- production builds for `lab/ui`, `doctor/ui`, and `patient/ui`.
 
 ### 5. Complete patient workflow integration
 
@@ -315,7 +360,8 @@ It must be updated to use publication-only grant expiry, laboratory role session
 
 1. Run live patient OTP and doctor registration/login/queue testing on Windows.
 2. Fix any Atlas/API issues found during those tests.
-3. Refactor and protect laboratory routes.
-4. Connect the laboratory UI to approved laboratory sessions and publication-only grants.
-5. Integrate original PDF metadata/storage with the Python extraction pipeline.
+3. Run the laboratory onboarding, grant, PDF upload, extraction-worker, review,
+   publication, and patient-download flow against Atlas.
+4. Integrate the real PDF/text extraction worker and preserve its provenance.
+5. Finish laboratory staff identity/sign-off and remove remaining unused demo UI.
 6. Test the complete patient → doctor → lab → published report flow.

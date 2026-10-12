@@ -33,3 +33,6 @@ htmlcov/
 
 .DS_Store
 Thumbs.db
+
+# Canonical laboratory original PDFs (runtime patient data)
+/lab/server/storage/

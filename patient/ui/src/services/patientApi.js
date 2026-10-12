@@ -66,6 +66,18 @@ export const patientApi = {
     return result.profile;
   },
 
+  async downloadOriginalReport(reportId) {
+    const headers = new Headers();
+    const token = this.getAccessToken();
+    if (token) headers.set('Authorization', `Bearer ${token}`);
+    const response = await fetch(`${API_BASE}/patient/reports/${reportId}/original`, { headers });
+    if (!response.ok) {
+      const payload = await response.json().catch(() => ({}));
+      parseResponse(response, payload);
+    }
+    return response.blob();
+  },
+
   async requestOtp({ phone, providerCode = null }) {
     return request('/auth/patient/request-otp', {
       method: 'POST',

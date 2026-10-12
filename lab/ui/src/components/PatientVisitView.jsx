@@ -16,11 +16,7 @@ export default function PatientVisitView({
   isProcessing,
   onBackToDashboard,
 }) {
-  const [selectedFile, setSelectedFile] = useState({
-    name: 'CBC_Report_Rahul_Sharma.pdf',
-    size: '184 KB',
-  });
-  const [triggerDemoReview, setTriggerDemoReview] = useState(false);
+  const [selectedFile, setSelectedFile] = useState(null);
 
   if (!identityData) {
     return (
@@ -52,8 +48,8 @@ export default function PatientVisitView({
 
   const handleUploadSubmit = () => {
     onUploadReport({
-      fileName: selectedFile?.name || 'CBC_Report_Rahul_Sharma.pdf',
-      caseType: triggerDemoReview ? 'needs_review_demo' : 'standard',
+      fileName: selectedFile?.name,
+      rawFile: selectedFile?.rawFile,
     });
   };
 
@@ -113,7 +109,7 @@ export default function PatientVisitView({
 
           <div className="identity-field-card">
             <div className="label">Age / Date of Birth</div>
-            <div className="val">{identity?.age} yrs ({identity?.date_of_birth})</div>
+            <div className="val">{identity?.date_of_birth || (identity?.age ? `${identity.age} yrs` : 'Unavailable')}</div>
           </div>
 
           <div className="identity-field-card">
@@ -136,7 +132,7 @@ export default function PatientVisitView({
             Complete Blood Count (CBC)
           </div>
           <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginTop: '0.2rem' }}>
-            Ordering Physician: Dr. Ramesh Mehta
+             Ordering Physician: {order?.ordering_doctor || 'Registered Doctor'}
           </div>
         </div>
       </div>
@@ -220,7 +216,7 @@ export default function PatientVisitView({
               </div>
 
               <div style={{ fontSize: '0.92rem', fontWeight: 700, color: 'var(--text-main)', fontFamily: 'var(--font-mono)' }}>
-                {selectedFile?.name || 'CBC_Report_Rahul_Sharma.pdf'}
+                {selectedFile?.name || 'No PDF selected'}
               </div>
 
               <div style={{ display: 'inline-block', marginTop: '0.5rem' }}>
@@ -230,34 +226,8 @@ export default function PatientVisitView({
               </div>
 
               <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.5rem' }}>
-                Original laboratory generated blood report ({selectedFile?.size || '184 KB'})
+                Original laboratory generated blood report ({selectedFile?.size || 'Select a PDF to continue'})
               </div>
-            </div>
-
-            {/* Optional Verification Discrepancy Toggle for Step 34 Demo */}
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                marginBottom: '1.25rem',
-                padding: '0.65rem 0.85rem',
-                background: 'var(--bg-page)',
-                borderRadius: 'var(--radius-md)',
-                fontSize: '0.8rem',
-                color: 'var(--text-secondary)',
-              }}
-            >
-              <input
-                type="checkbox"
-                id="toggle-discrepancy"
-                checked={triggerDemoReview}
-                onChange={(e) => setTriggerDemoReview(e.target.checked)}
-                style={{ cursor: 'pointer' }}
-              />
-              <label htmlFor="toggle-discrepancy" style={{ cursor: 'pointer' }}>
-                Simulate extraction discrepancy / low-confidence value (Triggers <code>NEEDS_REVIEW</code> to test Pathologist sign-off gate)
-              </label>
             </div>
 
             {/* Upload Button */}
@@ -265,6 +235,7 @@ export default function PatientVisitView({
               <button
                 className="btn-clinical primary"
                 onClick={handleUploadSubmit}
+                disabled={!selectedFile?.rawFile}
                 style={{ padding: '0.65rem 1.5rem', fontSize: '0.88rem' }}
               >
                 <UploadCloud size={16} />

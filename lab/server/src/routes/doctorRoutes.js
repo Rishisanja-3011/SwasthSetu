@@ -79,20 +79,47 @@ function publicEncounter(encounter, queueNumber = encounter.queue_number) {
 
 function publicIntake(intake) {
   if (!intake) return null;
+  const structuredData = intake.structured_data && typeof intake.structured_data === 'object'
+    ? intake.structured_data
+    : {};
+  const clinicalIntake = structuredData.clinical_intake && typeof structuredData.clinical_intake === 'object'
+    ? structuredData.clinical_intake
+    : structuredData;
+  const transcript = typeof intake.transcript === 'string' && intake.transcript.trim()
+    ? intake.transcript
+    : typeof structuredData.transcript === 'string'
+      ? structuredData.transcript
+      : structuredData.transcript?.text || '';
+  const confidence = structuredData.confidence && typeof structuredData.confidence === 'object'
+    ? structuredData.confidence.overall ?? intake.confidence
+    : structuredData.confidence ?? intake.confidence;
   return {
     id: intake._id,
     _id: intake._id,
     encounter_id: intake.encounter_id,
     patient_id: intake.patient_id,
     input_mode: intake.input_mode,
-    transcript: intake.transcript,
-    raw_transcript: intake.transcript,
-    chief_complaint: intake.chief_complaint,
-    duration: intake.duration,
-    symptoms: intake.symptoms,
+    language: structuredData.language || structuredData.selected_language || intake.language || '',
+    detected_language: structuredData.detected_language || '',
+    transcript,
+    raw_transcript: transcript,
+    chief_complaint: intake.chief_complaint || clinicalIntake.chief_complaint || '',
+    duration: intake.duration || clinicalIntake.duration || '',
+    symptoms: Array.isArray(intake.symptoms) && intake.symptoms.length > 0
+      ? intake.symptoms
+      : Array.isArray(clinicalIntake.symptoms) ? clinicalIntake.symptoms : [],
+    negative_symptoms: Array.isArray(clinicalIntake.negative_symptoms) ? clinicalIntake.negative_symptoms : [],
+    possible_symptom_categories: Array.isArray(clinicalIntake.possible_symptom_categories)
+      ? clinicalIntake.possible_symptom_categories
+      : [],
+    allergies: Array.isArray(clinicalIntake.allergies) ? clinicalIntake.allergies : [],
+    allergy_status: clinicalIntake.allergy_status || '',
+    relevant_history: Array.isArray(clinicalIntake.relevant_history) ? clinicalIntake.relevant_history : [],
+    medications: Array.isArray(clinicalIntake.medications) ? clinicalIntake.medications : [],
+    session_created_at: intake.created_at,
     structured_data: intake.structured_data,
-    confidence: intake.confidence,
-    provenance: intake.provenance,
+    confidence,
+    provenance: structuredData.provenance || intake.provenance,
     confirmed_at: intake.confirmed_at,
     audio_deleted: intake.audio_deleted,
     created_at: intake.created_at,
@@ -248,7 +275,7 @@ router.get('/encounter/:encounterId/cockpit', async (req, res) => {
       });
     }
 
-    const [intake, currentNote, currentOrders, priorNotes, reports] = await Promise.all([
+    const [intake, currentNote, currentOrders, priorNotes, priorEncounters, reports] = await Promise.all([
       SymptomIntake.findOne({ encounter_id: encounter._id }),
       ConsultationNote.findOne({ encounter_id: encounter._id }),
       DiagnosticOrder.find({ encounter_id: encounter._id }).sort({ created_at: -1 }),
@@ -258,6 +285,13 @@ router.get('/encounter/:encounterId/cockpit', async (req, res) => {
           patient_id: encounter.patient_id._id,
           encounter_id: { $ne: encounter._id },
         }).sort({ created_at: -1 })
+        : [],
+      encounter.visit_type === 'REVISITING'
+        ? Encounter.find({
+          doctor_id: req.doctor._id,
+          patient_id: encounter.patient_id._id,
+          _id: { $ne: encounter._id },
+        }).select('_id visit_type status queue_status created_at started_at ended_at').sort({ created_at: -1 })
         : [],
       DiagnosticReport.find({ patient_id: encounter.patient_id._id, status: 'PUBLISHED' })
         .populate('laboratory_id')
@@ -274,6 +308,21 @@ router.get('/encounter/:encounterId/cockpit', async (req, res) => {
       original_file_name: report.original_file_name,
       observations: await LabObservation.find({ report_id: report._id }),
     })));
+
+    const priorIntakeDocuments = priorEncounters.length > 0
+      ? await SymptomIntake.find({ encounter_id: { $in: priorEncounters.map((item) => item._id) } })
+      : [];
+    const priorIntakesByEncounter = new Map(
+      priorIntakeDocuments.map((item) => [String(item.encounter_id), item]),
+    );
+    const priorIntakes = priorEncounters.map((priorEncounter) => ({
+      encounter_id: priorEncounter._id,
+      visit_type: priorEncounter.visit_type,
+      status: priorEncounter.status,
+      queue_status: priorEncounter.queue_status,
+      created_at: priorEncounter.created_at,
+      intake: publicIntake(priorIntakesByEncounter.get(String(priorEncounter._id))),
+    }));
 
     await audit(req, encounter, 'DOCTOR_OPENED_CLINICAL_COCKPIT', 'SUCCESS', {
       visit_type: encounter.visit_type,
@@ -298,6 +347,7 @@ router.get('/encounter/:encounterId/cockpit', async (req, res) => {
       current_note: currentNote?.notes_text || '',
       current_orders: currentOrders,
       prior_notes: priorNotes,
+      prior_intakes: priorIntakes,
       published_reports: publishedReports,
     });
   } catch (error) {

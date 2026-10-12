@@ -1,18 +1,23 @@
 import React, { useState } from 'react';
-import { Activity, Lock, User, ArrowRight, ShieldCheck } from 'lucide-react';
+import { Activity, User, ArrowRight, ShieldCheck } from 'lucide-react';
 
 export default function LabLoginView({ onLogin, lab }) {
-  const [username, setUsername] = useState('shalini.gupta@lifelinelab.in');
-  const [password, setPassword] = useState('••••••••');
+  const [phone, setPhone] = useState('+919820011223');
   const [labCode, setLabCode] = useState(lab?.qr_code_id || 'LAB-808');
+  const [errorMessage, setErrorMessage] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    onLogin({
-      name: 'Dr. Shalini Gupta',
-      role: 'Senior Hematopathologist',
-      labCode,
-    });
+    setErrorMessage('');
+    setIsSubmitting(true);
+    try {
+      await onLogin({ labCode, phone });
+    } catch (error) {
+      setErrorMessage(error.message || 'Laboratory sign-in failed.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -102,7 +107,7 @@ export default function LabLoginView({ onLogin, lab }) {
             />
           </div>
 
-          {/* User Email */}
+          {/* Registered Laboratory Phone */}
           <div style={{ marginBottom: '1.25rem' }}>
             <label
               style={{
@@ -113,13 +118,13 @@ export default function LabLoginView({ onLogin, lab }) {
                 marginBottom: '0.35rem',
               }}
             >
-              Operator Email / Staff ID
+              Registered Laboratory Phone
             </label>
             <div style={{ position: 'relative' }}>
               <input
                 type="text"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
                 style={{
                   width: '100%',
                   padding: '0.65rem 0.85rem 0.65rem 2.25rem',
@@ -139,50 +144,24 @@ export default function LabLoginView({ onLogin, lab }) {
             </div>
           </div>
 
-          {/* Security PIN / Password */}
-          <div style={{ marginBottom: '1.75rem' }}>
-            <label
-              style={{
-                display: 'block',
-                fontSize: '0.78rem',
-                fontWeight: 600,
-                color: 'var(--text-secondary)',
-                marginBottom: '0.35rem',
-              }}
-            >
-              Security Password / PIN
-            </label>
-            <div style={{ position: 'relative' }}>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '0.65rem 0.85rem 0.65rem 2.25rem',
-                  borderRadius: 'var(--radius-md)',
-                  border: '1px solid var(--border-medium)',
-                  fontSize: '0.88rem',
-                  color: 'var(--text-main)',
-                  backgroundColor: 'var(--bg-surface)',
-                }}
-                required
-              />
-              <Lock
-                size={16}
-                color="var(--text-muted)"
-                style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)' }}
-              />
-            </div>
+          <div style={{ marginBottom: '1.25rem', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+            Sign-in is tied to the approved laboratory provider account. Staff selection happens inside the authenticated workspace.
           </div>
+
+          {errorMessage && (
+            <div style={{ marginBottom: '1rem', padding: '0.65rem 0.8rem', borderRadius: 'var(--radius-md)', backgroundColor: '#fef2f2', color: '#b91c1c', fontSize: '0.8rem' }}>
+              {errorMessage}
+            </div>
+          )}
 
           {/* Sign In Button */}
           <button
             type="submit"
             className="btn-clinical primary"
             style={{ width: '100%', padding: '0.75rem', fontSize: '0.9rem' }}
+            disabled={isSubmitting}
           >
-            <span>Sign In to Laboratory Portal</span>
+            <span>{isSubmitting ? 'Signing in...' : 'Sign In to Laboratory Portal'}</span>
             <ArrowRight size={16} />
           </button>
         </form>

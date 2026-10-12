@@ -1,7 +1,23 @@
 import React from 'react';
 import { History, FileText, FlaskConical, Shield, Calendar, UserCheck } from 'lucide-react';
 
-export const RevisitingHistorySection = ({ priorNotes = [], publishedReports = [], doctorName = 'Dr. Ramesh Mehta' }) => {
+const EMPTY_VALUE = '— Not available yet —';
+
+function valueOrBlank(value) {
+  if (Array.isArray(value)) return value.length ? value.join(', ') : EMPTY_VALUE;
+  return value === undefined || value === null || String(value).trim() === '' ? EMPTY_VALUE : value;
+}
+
+function IntakeField({ label, value }) {
+  return (
+    <div>
+      <div style={{ fontSize: '0.68rem', fontWeight: 800, color: 'var(--slate-500)', textTransform: 'uppercase', marginBottom: 3 }}>{label}</div>
+      <div style={{ fontSize: '0.82rem', fontWeight: 650, color: valueOrBlank(value) === EMPTY_VALUE ? 'var(--slate-400)' : 'var(--navy-900)' }}>{valueOrBlank(value)}</div>
+    </div>
+  );
+}
+
+export const RevisitingHistorySection = ({ priorNotes = [], priorIntakes = [], publishedReports = [], doctorName = 'Dr. Ramesh Mehta' }) => {
   return (
     <div style={{ marginBottom: 28 }}>
       <div style={{
@@ -239,6 +255,49 @@ export const RevisitingHistorySection = ({ priorNotes = [], publishedReports = [
             </div>
           )}
         </div>
+      </div>
+
+      {/* 3. Previous structured clinical intake, limited to this doctor's encounters */}
+      <div className="v-card" style={{ marginTop: 20 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, paddingBottom: 8, borderBottom: '1px solid var(--border-subtle)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <History size={18} color="var(--teal-600)" />
+            <span style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--navy-900)' }}>Previous Clinical Intake</span>
+          </div>
+          <span style={{ fontSize: '0.72rem', color: 'var(--slate-500)', fontWeight: 600 }}>
+            {priorIntakes.length} previous session{priorIntakes.length === 1 ? '' : 's'}
+          </span>
+        </div>
+        <div style={{ fontSize: '0.76rem', color: 'var(--slate-500)', marginBottom: 12, backgroundColor: '#f8fafc', padding: '6px 10px', borderRadius: 6 }}>
+          Structured intake from previous consultations with {doctorName}. Missing extraction fields are intentionally blank for now.
+        </div>
+        {priorIntakes.length > 0 ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {priorIntakes.map((item, index) => {
+              const intake = item.intake || {};
+              return (
+                <div key={item.encounter_id || index} style={{ padding: 14, borderRadius: 10, backgroundColor: '#f8fafc', border: '1px solid var(--slate-200)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, fontSize: '0.74rem', color: 'var(--slate-500)' }}>
+                    <span>{item.created_at ? new Date(item.created_at).toLocaleString() : EMPTY_VALUE}</span>
+                    <span style={{ fontWeight: 800, color: 'var(--blue-700)', backgroundColor: 'var(--blue-50)', padding: '2px 7px', borderRadius: 4 }}>{item.visit_type || 'CONSULTATION'}</span>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 14 }}>
+                    <IntakeField label="Original language" value={intake.language} />
+                    <IntakeField label="Chief complaint" value={intake.chief_complaint} />
+                    <IntakeField label="Duration" value={intake.duration} />
+                    <IntakeField label="Possible category" value={intake.possible_symptom_categories} />
+                    <IntakeField label="Symptoms" value={intake.symptoms} />
+                    <IntakeField label="Allergies" value={intake.allergies} />
+                    <IntakeField label="Input mode" value={intake.input_mode ? String(intake.input_mode).toUpperCase() : ''} />
+                    <IntakeField label="Session created" value={intake.session_created_at ? new Date(intake.session_created_at).toLocaleString() : item.created_at ? new Date(item.created_at).toLocaleString() : ''} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div style={{ padding: '20px 0', textAlign: 'center', color: 'var(--slate-400)', fontSize: '0.84rem' }}>{EMPTY_VALUE}</div>
+        )}
       </div>
     </div>
   );

@@ -37,6 +37,15 @@ const labAccessGrantSchema = new mongoose.Schema({
     ref: 'DiagnosticReport',
     default: null,
   },
+  report_id: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'DiagnosticReport',
+    default: null,
+  },
+  granted_at: {
+    type: Date,
+    default: Date.now,
+  },
 });
 
 // Laboratory access ends only when the associated report is published.
