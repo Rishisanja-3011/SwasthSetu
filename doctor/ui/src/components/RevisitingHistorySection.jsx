@@ -188,7 +188,7 @@ export const RevisitingHistorySection = ({ priorNotes = [], priorIntakes = [], p
                         {rep.test_type || 'Complete Blood Count (CBC)'}
                       </div>
                       <div style={{ fontSize: '0.76rem', color: 'var(--slate-500)' }}>
-                        {rep.laboratory_name} ({rep.laboratory_code || 'LAB-808'}) • {rep.published_at ? new Date(rep.published_at).toLocaleDateString() : 'Recent'}
+                        {rep.laboratory_name || '— Not available yet —'} ({rep.laboratory_code || '— Not available yet —'}) • {rep.published_at ? new Date(rep.published_at).toLocaleDateString() : '— Not available yet —'}
                       </div>
                     </div>
                     <span style={{

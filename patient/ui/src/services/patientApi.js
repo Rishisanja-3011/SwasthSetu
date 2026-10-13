@@ -16,7 +16,9 @@ function parseResponse(response, json) {
 
 async function request(path, options = {}, authenticated = true) {
   const headers = new Headers(options.headers || {});
-  if (options.body && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
+  if (options.body && !(typeof FormData !== 'undefined' && options.body instanceof FormData) && !headers.has('Content-Type')) {
+    headers.set('Content-Type', 'application/json');
+  }
 
   if (authenticated) {
     const token = patientApi.getAccessToken();
@@ -165,6 +167,15 @@ export const patientApi = {
   },
 
   async createEncounter({ doctor, visitType }) {
+    const existing = this.getActiveEncounter();
+    if (existing?.id && existing.status === 'OPEN' && existing.visit_type === visitType && String(existing.doctor_id) === String(doctor.id || doctor._id || doctor.qr_code_id)) {
+      try {
+        const current = await this.refreshEncounter(existing.id);
+        if (current?.status === 'OPEN') return current;
+      } catch {
+        this.clearActiveEncounter();
+      }
+    }
     const result = await request('/patient/encounters', {
       method: 'POST',
       body: JSON.stringify({ doctor_code: doctor.qr_code_id, visit_type: visitType }),
@@ -174,15 +185,45 @@ export const patientApi = {
     return encounter;
   },
 
-  async submitIntake({ encounterId, inputMode, rawTranscript, structuredData, confidence = 0.94 }) {
-    const result = await request(`/patient/encounters/${encounterId}/intake`, {
+  saveActiveEncounter(encounter) {
+    if (encounter?.id) {
+      localStorage.setItem(STORAGE_KEYS.ACTIVE_ENCOUNTER, JSON.stringify(encounter));
+    } else {
+      this.clearActiveEncounter();
+    }
+  },
+
+  async processTextIntake({ encounterId, language, text }) {
+    const result = await request(`/patient/encounters/${encodeURIComponent(encounterId)}/intake/process-text`, {
       method: 'POST',
-      body: JSON.stringify({
-        input_mode: String(inputMode || '').toUpperCase(),
-        transcript: rawTranscript || '',
-        structured_data: structuredData || {},
-        confidence,
-      }),
+      body: JSON.stringify({ input_mode: 'TEXT', language, text }),
+    });
+    return result.intake;
+  },
+
+  async processVoiceIntake({ encounterId, language, browserTranscript = '', transcriptReliable = true, audioBlob = null }) {
+    const formData = new FormData();
+    formData.append('language', language);
+    formData.append('input_mode', 'VOICE');
+    formData.append('browser_transcript', browserTranscript);
+    formData.append('transcript_reliable', String(transcriptReliable));
+    if (audioBlob) formData.append('audio', audioBlob, 'patient-intake.webm');
+    const result = await request(`/patient/encounters/${encodeURIComponent(encounterId)}/intake/process-voice`, {
+      method: 'POST',
+      body: formData,
+    });
+    return result.intake;
+  },
+
+  async prepareSkippedIntake({ encounterId }) {
+    const result = await request(`/patient/encounters/${encodeURIComponent(encounterId)}/intake/skip`, { method: 'POST' });
+    return result.intake;
+  },
+
+  async confirmIntake({ encounterId, inputMode, structuredData }) {
+    const result = await request(`/patient/encounters/${encodeURIComponent(encounterId)}/intake/confirm`, {
+      method: 'POST',
+      body: JSON.stringify({ patient_confirmed: true, input_mode: String(inputMode || '').toUpperCase(), structured_data: structuredData || {} }),
     });
     return result.intake;
   },
@@ -199,7 +240,7 @@ export const patientApi = {
   async refreshEncounter(encounterId) {
     const result = await request(`/patient/encounters/${encounterId}`);
     const encounter = result.encounter;
-    localStorage.setItem(STORAGE_KEYS.ACTIVE_ENCOUNTER, JSON.stringify(encounter));
+    this.saveActiveEncounter(encounter);
     return encounter;
   },
 

@@ -331,7 +331,7 @@ export const ClinicalCockpitScreen = () => {
               <StatusBadge type={encounter?.visit_type} />
             </div>
             <div style={{ fontSize: '0.86rem', color: 'var(--slate-600)', marginTop: 2 }}>
-              ID: <strong>{patient?.patient_identifier}</strong> • Age: <strong>{patient?.age || '32'}y</strong> • Gender: <strong>{patient?.gender || 'Male'}</strong> • Phone: <strong>{patient?.phone}</strong>
+              ID: <strong>{patient?.patient_identifier || '— Not available yet —'}</strong> • Age: <strong>{patient?.age ? `${patient.age}y` : '— Not available yet —'}</strong> • Gender: <strong>{patient?.gender || '— Not available yet —'}</strong> • Phone: <strong>{patient?.phone || '— Not available yet —'}</strong>
             </div>
           </div>
 

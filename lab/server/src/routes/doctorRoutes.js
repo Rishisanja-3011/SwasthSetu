@@ -53,6 +53,7 @@ function publicDoctor(doctor, stats = {}) {
 
 function lifecycleState(encounter) {
   if (encounter.status === 'CLOSED') return 'CONSULTATION_COMPLETED';
+  if (encounter.queue_status === 'INTAKE_PENDING') return 'INTAKE_PENDING';
   if (encounter.queue_status === 'DOCTOR_REVIEWING') return 'DOCTOR_REVIEWING';
   if (encounter.queue_status === 'IN_CONSULTATION') return 'CONSULTATION_STARTED';
   if (encounter.queue_status === 'CALLED') return 'PLEASE_COME_IN';
@@ -79,6 +80,9 @@ function publicEncounter(encounter, queueNumber = encounter.queue_number) {
 
 function publicIntake(intake) {
   if (!intake) return null;
+  // A prepared but unconfirmed intake is visible only to its patient review
+  // screen. It must never enter a doctor's queue or cockpit.
+  if (intake.patient_confirmed !== true && !intake.confirmed_at) return null;
   const structuredData = intake.structured_data && typeof intake.structured_data === 'object'
     ? intake.structured_data
     : {};
@@ -100,7 +104,12 @@ function publicIntake(intake) {
     patient_id: intake.patient_id,
     input_mode: intake.input_mode,
     language: structuredData.language || structuredData.selected_language || intake.language || '',
-    detected_language: structuredData.detected_language || '',
+    selected_language: structuredData.selected_language || intake.language || '',
+    detected_language: structuredData.detected_language || intake.detected_language || '',
+    language_match: structuredData.language_match ?? null,
+    language_confidence: structuredData.language_confidence ?? intake.language_confidence ?? 0,
+    transcription_source: structuredData.transcript?.source || intake.transcription_source || '',
+    transcription_confidence: structuredData.confidence?.transcription ?? intake.transcription_confidence ?? 0,
     transcript,
     raw_transcript: transcript,
     chief_complaint: intake.chief_complaint || clinicalIntake.chief_complaint || '',
@@ -116,10 +125,15 @@ function publicIntake(intake) {
     allergy_status: clinicalIntake.allergy_status || '',
     relevant_history: Array.isArray(clinicalIntake.relevant_history) ? clinicalIntake.relevant_history : [],
     medications: Array.isArray(clinicalIntake.medications) ? clinicalIntake.medications : [],
+    urgency: clinicalIntake.urgency || '',
+    extraction_status: structuredData.extraction_status || intake.extraction_status || '',
     session_created_at: intake.created_at,
     structured_data: intake.structured_data,
     confidence,
     provenance: structuredData.provenance || intake.provenance,
+    patient_confirmed: intake.patient_confirmed === true || Boolean(intake.confirmed_at),
+    patient_confirmed_at: intake.patient_confirmed_at || intake.confirmed_at,
+    pipeline_version: structuredData.pipeline_version || intake.pipeline_version || '',
     confirmed_at: intake.confirmed_at,
     audio_deleted: intake.audio_deleted,
     created_at: intake.created_at,
@@ -208,6 +222,7 @@ router.get('/queue/:doctorId', async (req, res) => {
 
     const queue = await Promise.all(encounters.map(async (encounter, index) => {
       const intake = await SymptomIntake.findOne({ encounter_id: encounter._id });
+      const publicIntakeData = publicIntake(intake);
       const patient = encounter.patient_id;
       return {
         ...publicEncounter(encounter, index + 1),
@@ -218,11 +233,11 @@ router.get('/queue/:doctorId', async (req, res) => {
         patient_identifier: patient?.patient_identifier || 'PT-UNKNOWN',
         age: patient?.age,
         gender: patient?.gender,
-        has_intake: Boolean(intake),
-        chief_complaint: intake?.chief_complaint || 'Intake pending',
-        duration: intake?.duration || '',
-        symptoms: intake?.symptoms || [],
-        intake: publicIntake(intake),
+        has_intake: Boolean(publicIntakeData),
+        chief_complaint: publicIntakeData?.chief_complaint || 'Intake pending',
+        duration: publicIntakeData?.duration || '',
+        symptoms: publicIntakeData?.symptoms || [],
+        intake: publicIntakeData,
       };
     }));
 
@@ -263,6 +278,9 @@ router.get('/encounter/:encounterId/cockpit', async (req, res) => {
   try {
     const encounter = await ownedEncounter(req, res);
     if (!encounter) return undefined;
+    if (encounter.queue_status === 'INTAKE_PENDING') {
+      return res.status(409).json({ success: false, error: 'INTAKE_NOT_CONFIRMED' });
+    }
     if (encounter.status === 'CLOSED') {
       await audit(req, encounter, 'HISTORICAL_ACCESS_DENIED_CLOSED_ENCOUNTER', 'DENIED', {
         reason: 'Closed encounters cannot be queried by doctors.',

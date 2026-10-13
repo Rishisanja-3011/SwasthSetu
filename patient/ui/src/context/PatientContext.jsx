@@ -96,6 +96,7 @@ export function PatientProvider({ children }) {
   };
 
   const updateActiveEncounter = (encounter) => {
+    patientApi.saveActiveEncounter(encounter);
     setActiveEncounter(encounter);
     setRefreshTrigger((value) => value + 1);
   };

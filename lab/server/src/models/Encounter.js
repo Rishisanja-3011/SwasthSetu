@@ -24,7 +24,7 @@ const encounterSchema = new mongoose.Schema({
   },
   queue_status: {
     type: String,
-    enum: ['WAITING', 'DOCTOR_REVIEWING', 'IN_CONSULTATION', 'CALLED'],
+    enum: ['INTAKE_PENDING', 'WAITING', 'DOCTOR_REVIEWING', 'IN_CONSULTATION', 'CALLED'],
     default: 'WAITING',
     index: true,
   },

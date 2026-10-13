@@ -1,5 +1,6 @@
 const express = require('express');
 const mongoose = require('mongoose');
+const multer = require('multer');
 
 const {
   Patient,
@@ -20,8 +21,33 @@ const {
 const { requireAuth, requireRole } = require('../middleware/requireAuth');
 const { publicProvider, resolveProvider } = require('../services/providerService');
 const { downloadOriginalPdf } = require('../services/reportFiles');
+const { normalizeLanguage } = require('../services/languageService');
+const {
+  MAX_AUDIO_BYTES,
+  SUPPORTED_AUDIO_MIME_TYPES,
+  TranscriptionError,
+  normalizeMimeType,
+  transcribeAudio,
+} = require('../services/transcriptionService');
+const {
+  PIPELINE_VERSION,
+  processClinicalIntake,
+  sanitizeClinicalIntake,
+} = require('../services/clinicalIntakeService');
 
 const router = express.Router();
+const audioUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: MAX_AUDIO_BYTES },
+  fileFilter: (req, file, callback) => {
+    if (!SUPPORTED_AUDIO_MIME_TYPES.has(normalizeMimeType(file.mimetype))) {
+      const error = new Error('UNSUPPORTED_AUDIO_TYPE');
+      error.code = 'UNSUPPORTED_AUDIO_TYPE';
+      return callback(error);
+    }
+    return callback(null, true);
+  },
+});
 
 router.use(requireAuth, requireRole('PATIENT'));
 
@@ -35,6 +61,108 @@ function reportIdentifier(report) {
 
 function isValidObjectId(value) {
   return mongoose.isValidObjectId(value);
+}
+
+function jsonEqual(left, right) {
+  return JSON.stringify(left) === JSON.stringify(right);
+}
+
+function intakeDocumentFields(structuredData, inputMode, patientId, encounterId) {
+  const clinical = structuredData.clinical_intake || {};
+  const confidence = structuredData.confidence || {};
+  const transcript = structuredData.transcript || {};
+  return {
+    encounter_id: encounterId,
+    patient_id: patientId,
+    input_mode: inputMode,
+    transcript: transcript.text || '',
+    transcription_source: transcript.source || '',
+    transcription_confidence: Number(confidence.transcription || 0),
+    language: structuredData.selected_language || '',
+    detected_language: structuredData.detected_language || '',
+    language_confidence: Number(structuredData.language_confidence || confidence.language || 0),
+    chief_complaint: clinical.chief_complaint || '',
+    duration: clinical.duration || '',
+    symptoms: Array.isArray(clinical.symptoms) ? clinical.symptoms : [],
+    negative_symptoms: Array.isArray(clinical.negative_symptoms) ? clinical.negative_symptoms : [],
+    possible_symptom_categories: Array.isArray(clinical.possible_symptom_categories) ? clinical.possible_symptom_categories : [],
+    relevant_history: Array.isArray(clinical.relevant_history) ? clinical.relevant_history : [],
+    medications: Array.isArray(clinical.medications) ? clinical.medications : [],
+    allergies: Array.isArray(clinical.allergies) ? clinical.allergies : [],
+    allergy_status: clinical.allergy_status || 'UNKNOWN',
+    urgency: clinical.urgency || '',
+    structured_data: structuredData,
+    confidence: Number(confidence.overall || 0),
+    provenance: structuredData.provenance || {},
+    extraction_status: structuredData.extraction_status || 'READY',
+    pipeline_version: structuredData.pipeline_version || PIPELINE_VERSION,
+    patient_confirmed: Boolean(structuredData.patient_confirmed),
+    patient_confirmed_at: structuredData.patient_confirmed_at || null,
+    confirmed_at: structuredData.patient_confirmed_at || null,
+  };
+}
+
+async function getOwnedOpenEncounter(req, patient) {
+  if (!patient || !isValidObjectId(req.params.encounterId)) return null;
+  return Encounter.findOne({
+    _id: req.params.encounterId,
+    patient_id: patient._id,
+    status: 'OPEN',
+  });
+}
+
+async function savePreparedIntake({ req, patient, encounter, inputMode, structuredData, audioDeleted = false }) {
+  const existing = await SymptomIntake.findOne({ encounter_id: encounter._id });
+  if (existing?.patient_confirmed) {
+    const error = new Error('This intake has already been confirmed.');
+    error.code = 'INTAKE_ALREADY_CONFIRMED';
+    throw error;
+  }
+
+  const fields = intakeDocumentFields(structuredData, inputMode, patient._id, encounter._id);
+  fields.audio_deleted = audioDeleted;
+  const intake = await SymptomIntake.findOneAndUpdate(
+    { encounter_id: encounter._id },
+    fields,
+    { upsert: true, new: true, setDefaultsOnInsert: true, runValidators: true },
+  );
+
+  await AIArtifact.create({
+    encounter_id: encounter._id,
+    artifact_type: 'STRUCTURED_CLINICAL_INTAKE',
+    content: structuredData,
+    source_reference: intake._id.toString(),
+  });
+  await AuditEvent.create({
+    actor_type: 'PATIENT',
+    actor_id: patient._id.toString(),
+    action: structuredData.extraction_status === 'READY'
+      ? 'PATIENT_INTAKE_EXTRACTION'
+      : 'PATIENT_INTAKE_EXTRACTION_FAILED',
+    resource_type: 'SymptomIntake',
+    resource_id: intake._id.toString(),
+    patient_id: patient._id,
+    outcome: structuredData.extraction_status === 'READY' ? 'SUCCESS' : 'FAILED',
+    details: {
+      input_mode: inputMode,
+      pipeline_version: PIPELINE_VERSION,
+      extraction_status: structuredData.extraction_status,
+    },
+  });
+  return intake;
+}
+
+function uploadAudio(req, res, next) {
+  return audioUpload.single('audio')(req, res, (error) => {
+    if (!error) return next();
+    if (error.code === 'LIMIT_FILE_SIZE') {
+      return res.status(413).json({ success: false, error: 'AUDIO_TOO_LARGE' });
+    }
+    if (error.code === 'LIMIT_UNEXPECTED_FILE' || error.message === 'Unexpected field') {
+      return res.status(400).json({ success: false, error: 'INVALID_AUDIO_FIELD' });
+    }
+    return res.status(400).json({ success: false, error: 'UNSUPPORTED_AUDIO_TYPE' });
+  });
 }
 
 function explanationForObservation(observation) {
@@ -411,15 +539,25 @@ router.post('/encounters', async (req, res) => {
       return res.status(400).json({ success: false, error: 'INVALID_VISIT_TYPE' });
     }
 
-    const encounter = await Encounter.create({
+    let encounter = await Encounter.findOne({
       patient_id: patient._id,
       doctor_id: provider.provider_id,
       visit_type: req.body.visit_type,
       status: 'OPEN',
-      queue_status: 'WAITING',
-    });
+      queue_status: { $in: ['INTAKE_PENDING', 'WAITING', 'DOCTOR_REVIEWING', 'CALLED', 'IN_CONSULTATION'] },
+    }).sort({ created_at: -1 });
+    const reusedEncounter = Boolean(encounter);
+    if (!encounter) {
+      encounter = await Encounter.create({
+        patient_id: patient._id,
+        doctor_id: provider.provider_id,
+        visit_type: req.body.visit_type,
+        status: 'OPEN',
+        queue_status: 'INTAKE_PENDING',
+      });
+    }
 
-    await AuditEvent.create({
+    if (!reusedEncounter) await AuditEvent.create({
       actor_type: 'PATIENT',
       actor_id: patient._id.toString(),
       action: 'PATIENT_OPENED_DOCTOR_ENCOUNTER',
@@ -442,7 +580,7 @@ router.post('/encounters', async (req, res) => {
         doctor_code: provider.provider_code,
         visit_type: encounter.visit_type,
         status: encounter.status,
-        lifecycle_state: 'WAITING',
+        lifecycle_state: 'INTAKE_PENDING',
         queue_number: encounter.queue_number,
         created_at: encounter.created_at,
       },
@@ -453,73 +591,282 @@ router.post('/encounters', async (req, res) => {
   }
 });
 
-router.post('/encounters/:encounterId/intake', async (req, res) => {
+router.post('/encounters/:encounterId/intake/skip', async (req, res) => {
   try {
     const patient = await getAuthenticatedPatient(req);
-    if (!patient || !isValidObjectId(req.params.encounterId)) {
-      return res.status(404).json({ success: false, error: 'ENCOUNTER_NOT_FOUND' });
-    }
-    const encounter = await Encounter.findOne({
-      _id: req.params.encounterId,
-      patient_id: patient?._id,
-    });
+    const encounter = await getOwnedOpenEncounter(req, patient);
     if (!encounter) return res.status(404).json({ success: false, error: 'ENCOUNTER_NOT_FOUND' });
-    if (encounter.status !== 'OPEN') return res.status(403).json({ success: false, error: 'ENCOUNTER_CLOSED' });
+    if (encounter.visit_type !== 'REVISITING') return res.status(400).json({ success: false, error: 'NEW_CONSULTATION_INTAKE_REQUIRED' });
 
-    const inputMode = String(req.body.input_mode || '').toUpperCase();
-    if (!['VOICE', 'TEXT', 'SKIPPED'].includes(inputMode)) {
+    const structuredData = {
+      schema_version: PIPELINE_VERSION,
+      selected_language: '',
+      detected_language: '',
+      language_match: null,
+      language_confidence: 0,
+      transcript: { text: '', source: 'PATIENT_TYPED', created_at: new Date().toISOString() },
+      clinical_intake: {
+        chief_complaint: '', duration: '', symptoms: [], negative_symptoms: [],
+        possible_symptom_categories: [], relevant_history: [], medications: [], allergies: [],
+        allergy_status: 'UNKNOWN', urgency: '',
+      },
+      confidence: { transcription: 0, language: 0, chief_complaint: 0, symptoms: 0, duration: 0, category: 0, allergies: 0, urgency: 0, overall: 0 },
+      provenance: { original_text: 'PATIENT_TYPED', detected_language: 'UNKNOWN', structured_fields: 'PATIENT_EDITED', field_provenance: {} },
+      patient_confirmed: false,
+      patient_confirmed_at: null,
+      extraction_status: 'SKIPPED',
+      pipeline_version: PIPELINE_VERSION,
+    };
+    const intake = await savePreparedIntake({ req, patient, encounter, inputMode: 'SKIPPED', structuredData, audioDeleted: true });
+    return res.status(201).json({ success: true, intake, encounter_id: encounter._id });
+  } catch (error) {
+    if (error.code === 'INTAKE_ALREADY_CONFIRMED') return res.status(409).json({ success: false, error: error.code });
+    console.error('Patient skipped intake error:', error.name || 'Error');
+    return res.status(500).json({ success: false, error: 'INTAKE_PROCESSING_FAILED' });
+  }
+});
+
+router.post('/encounters/:encounterId/intake/process-text', async (req, res) => {
+  try {
+    if (req.body.input_mode && String(req.body.input_mode).toUpperCase() !== 'TEXT') {
       return res.status(400).json({ success: false, error: 'INVALID_INPUT_MODE' });
     }
+    const patient = await getAuthenticatedPatient(req);
+    const encounter = await getOwnedOpenEncounter(req, patient);
+    if (!encounter) return res.status(404).json({ success: false, error: 'ENCOUNTER_NOT_FOUND' });
+
+    const text = typeof req.body.text === 'string' ? req.body.text : '';
+    if (text.length > 8000) {
+      await AuditEvent.create({ actor_type: 'PATIENT', actor_id: patient._id.toString(), action: 'PATIENT_INTAKE_EXTRACTION_FAILED', resource_type: 'Encounter', resource_id: encounter._id.toString(), patient_id: patient._id, outcome: 'FAILED', details: { reason: 'PATIENT_TEXT_TOO_LARGE' } });
+      return res.status(413).json({ success: false, error: 'PATIENT_TEXT_TOO_LARGE' });
+    }
+    const selectedLanguage = normalizeLanguage(req.body.language, null);
+    if (!selectedLanguage) return res.status(400).json({ success: false, error: 'UNSUPPORTED_LANGUAGE' });
+    if (!text.trim()) {
+      await AuditEvent.create({ actor_type: 'PATIENT', actor_id: patient._id.toString(), action: 'PATIENT_INTAKE_EXTRACTION_FAILED', resource_type: 'Encounter', resource_id: encounter._id.toString(), patient_id: patient._id, outcome: 'FAILED', details: { reason: 'EMPTY_PATIENT_TEXT' } });
+      return res.status(400).json({ success: false, error: 'EMPTY_PATIENT_TEXT' });
+    }
+    const structuredData = await processClinicalIntake({
+      text,
+      selectedLanguage,
+      inputMode: 'TEXT',
+      transcriptSource: 'PATIENT_TYPED',
+      transcriptionConfidence: 1,
+    });
+    const intake = await savePreparedIntake({
+      req,
+      patient,
+      encounter,
+      inputMode: 'TEXT',
+      structuredData,
+      audioDeleted: true,
+    });
+    return res.status(201).json({ success: true, intake, encounter_id: encounter._id });
+  } catch (error) {
+    if (error.code === 'EMPTY_PATIENT_TEXT') return res.status(400).json({ success: false, error: error.code });
+    if (error.code === 'INTAKE_ALREADY_CONFIRMED') return res.status(409).json({ success: false, error: error.code });
+    console.error('Patient text intake processing error:', error.name || 'Error');
+    return res.status(500).json({ success: false, error: 'INTAKE_PROCESSING_FAILED' });
+  }
+});
+
+router.post('/encounters/:encounterId/intake/process-voice', uploadAudio, async (req, res) => {
+  try {
+    const patient = await getAuthenticatedPatient(req);
+    const encounter = await getOwnedOpenEncounter(req, patient);
+    if (!encounter) return res.status(404).json({ success: false, error: 'ENCOUNTER_NOT_FOUND' });
+
+    if (req.body.input_mode && String(req.body.input_mode).toUpperCase() !== 'VOICE') {
+      return res.status(400).json({ success: false, error: 'INVALID_INPUT_MODE' });
+    }
+    const selectedLanguage = normalizeLanguage(req.body.language, null);
+    if (!selectedLanguage) return res.status(400).json({ success: false, error: 'UNSUPPORTED_LANGUAGE' });
+    const browserTranscript = typeof req.body.browser_transcript === 'string' ? req.body.browser_transcript : '';
+    if (browserTranscript.length > 8000) {
+      await AuditEvent.create({
+        actor_type: 'PATIENT',
+        actor_id: patient._id.toString(),
+        action: 'PATIENT_INTAKE_EXTRACTION_FAILED',
+        resource_type: 'Encounter',
+        resource_id: encounter._id.toString(),
+        patient_id: patient._id,
+        outcome: 'FAILED',
+        details: { reason: 'PATIENT_TEXT_TOO_LARGE', input_mode: 'VOICE' },
+      });
+      return res.status(413).json({ success: false, error: 'PATIENT_TEXT_TOO_LARGE' });
+    }
+    const browserReliable = String(req.body.transcript_reliable ?? 'true').toLowerCase() !== 'false';
+    let transcript;
+    let transcriptSource;
+    let detectedLanguage;
+    let languageConfidence;
+    let transcriptionConfidence;
+
+    if (browserReliable && browserTranscript.trim()) {
+      transcript = browserTranscript;
+      transcriptSource = 'BROWSER_TRANSCRIPT';
+      // buildClinicalIntake independently detects this text, so a browser
+      // recognition language can never be mistaken for the selected hint.
+      transcriptionConfidence = 0.75;
+    } else {
+      if (!req.file) return res.status(400).json({ success: false, error: 'VOICE_INPUT_REQUIRED' });
+      const transcription = await transcribeAudio({
+        audioBuffer: req.file.buffer,
+        mimeType: req.file.mimetype,
+        preferredLanguage: selectedLanguage,
+      });
+      transcript = transcription.transcript;
+      transcriptSource = 'SERVER_TRANSCRIPTION';
+      detectedLanguage = transcription.detected_language;
+      languageConfidence = transcription.language_confidence;
+      transcriptionConfidence = transcription.transcription_confidence;
+    }
+
+    const structuredData = await processClinicalIntake({
+      text: transcript,
+      selectedLanguage,
+      inputMode: 'VOICE',
+      transcriptSource,
+      detectedLanguage,
+      languageConfidence,
+      transcriptionConfidence,
+    });
+    const intake = await savePreparedIntake({
+      req,
+      patient,
+      encounter,
+      inputMode: 'VOICE',
+      structuredData,
+      audioDeleted: false,
+    });
+    return res.status(201).json({ success: true, intake, encounter_id: encounter._id });
+  } catch (error) {
+    if (error.code === 'INTAKE_ALREADY_CONFIRMED') return res.status(409).json({ success: false, error: error.code });
+    if (error instanceof TranscriptionError) {
+      await AuditEvent.create({
+        actor_type: 'PATIENT',
+        actor_id: req.auth.sub,
+        action: 'PATIENT_VOICE_TRANSCRIPTION_FAILED',
+        resource_type: 'Encounter',
+        resource_id: req.params.encounterId,
+        outcome: 'FAILED',
+        details: { reason: error.code },
+      }).catch(() => undefined);
+      const status = ['EMPTY_AUDIO', 'UNSUPPORTED_AUDIO_TYPE', 'AUDIO_TOO_LARGE'].includes(error.code) ? 400 : 502;
+      return res.status(status).json({ success: false, error: error.code, message: error.message });
+    }
+    if (error.code === 'EMPTY_PATIENT_TEXT') return res.status(400).json({ success: false, error: error.code });
+    console.error('Patient voice intake processing error:', error.name || 'Error');
+    return res.status(500).json({ success: false, error: 'INTAKE_PROCESSING_FAILED' });
+  }
+});
+
+router.post('/encounters/:encounterId/intake/confirm', async (req, res) => {
+  try {
+    if (req.body.patient_confirmed !== true) return res.status(400).json({ success: false, error: 'PATIENT_CONFIRMATION_REQUIRED' });
+    const patient = await getAuthenticatedPatient(req);
+    const encounter = await getOwnedOpenEncounter(req, patient);
+    if (!encounter) return res.status(404).json({ success: false, error: 'ENCOUNTER_NOT_FOUND' });
+    const intake = await SymptomIntake.findOne({ encounter_id: encounter._id, patient_id: patient._id });
+    if (!intake) return res.status(404).json({ success: false, error: 'INTAKE_NOT_PREPARED' });
+    if (intake.patient_confirmed) return res.status(409).json({ success: false, error: 'INTAKE_ALREADY_CONFIRMED' });
+
+    const inputMode = String(req.body.input_mode || intake.input_mode).toUpperCase();
+    if (!['VOICE', 'TEXT', 'SKIPPED'].includes(inputMode)) return res.status(400).json({ success: false, error: 'INVALID_INPUT_MODE' });
     if (encounter.visit_type === 'NEW' && inputMode === 'SKIPPED') {
       return res.status(400).json({ success: false, error: 'NEW_CONSULTATION_INTAKE_REQUIRED' });
     }
 
-    const structuredData = req.body.structured_data || {};
-    const transcript = typeof req.body.transcript === 'string' ? req.body.transcript : '';
-    if (encounter.visit_type === 'NEW' && !transcript.trim() && !structuredData.chief_complaint) {
-      return res.status(400).json({ success: false, error: 'CONFIRMED_INTAKE_REQUIRED' });
+    let clinical;
+    if (inputMode === 'SKIPPED') {
+      clinical = sanitizeClinicalIntake({});
+    } else {
+      const incoming = req.body.structured_data?.clinical_intake || req.body.structured_data || {};
+      clinical = sanitizeClinicalIntake(incoming);
+      const hasConfirmedInformation = Boolean(
+        clinical.chief_complaint || clinical.duration || clinical.symptoms.length
+          || clinical.negative_symptoms.length || clinical.relevant_history.length
+          || clinical.medications.length || clinical.allergies.length
+          || clinical.allergy_status === 'NONE_REPORTED' || clinical.urgency,
+      );
+      if (encounter.visit_type === 'NEW' && !hasConfirmedInformation) {
+        return res.status(422).json({ success: false, error: 'EXTRACTION_REVIEW_REQUIRED' });
+      }
     }
 
-    const intake = await SymptomIntake.findOneAndUpdate(
-      { encounter_id: encounter._id },
-      {
-        patient_id: patient._id,
-        input_mode: inputMode,
-        transcript,
-        chief_complaint: structuredData.chief_complaint || '',
-        duration: structuredData.duration || '',
-        symptoms: Array.isArray(structuredData.symptoms) ? structuredData.symptoms : [],
-        structured_data: structuredData,
-        confidence: Number(req.body.confidence ?? structuredData.confidence ?? 0),
-        provenance: { transcript: 'PATIENT_REPORTED', structured_data: 'AI_GENERATED' },
-        confirmed_at: new Date(),
-      },
-      { upsert: true, new: true, setDefaultsOnInsert: true },
-    );
-
-    await AIArtifact.create({
-      encounter_id: encounter._id,
-      artifact_type: 'STRUCTURED_SYMPTOM_INTAKE',
-      content: structuredData,
-      source_reference: intake._id.toString(),
+    const oldClinical = intake.structured_data?.clinical_intake || {};
+    const fieldProvenance = { ...(intake.structured_data?.provenance?.field_provenance || {}) };
+    Object.keys(clinical).forEach((field) => {
+      if (jsonEqual(oldClinical[field] ?? '', clinical[field])) {
+        fieldProvenance[field] = fieldProvenance[field] || {
+          source: 'DETERMINISTIC_FALLBACK',
+          evidence: [],
+        };
+      } else {
+        fieldProvenance[field] = {
+          source: 'PATIENT_EDITED',
+          evidence: clinical[field] && (!Array.isArray(clinical[field]) || clinical[field].length > 0)
+            ? ['Patient-confirmed correction']
+            : [],
+        };
+      }
     });
+    const patientConfirmedAt = new Date();
+    const structuredData = {
+      ...(intake.structured_data || {}),
+      schema_version: PIPELINE_VERSION,
+      clinical_intake: clinical,
+      extraction_status: inputMode === 'SKIPPED' ? 'SKIPPED' : 'READY',
+      patient_confirmed: true,
+      patient_confirmed_at: patientConfirmedAt.toISOString(),
+      provenance: {
+        ...(intake.structured_data?.provenance || {}),
+        structured_fields: Object.values(fieldProvenance).some((item) => (typeof item === 'string' ? item : item?.source) === 'PATIENT_EDITED')
+          ? 'PATIENT_EDITED'
+          : (intake.structured_data?.provenance?.structured_fields || 'DETERMINISTIC_FALLBACK'),
+        field_provenance: fieldProvenance,
+      },
+    };
 
+    Object.assign(intake, intakeDocumentFields(structuredData, inputMode, patient._id, encounter._id), {
+      patient_confirmed: true,
+      patient_confirmed_at: patientConfirmedAt,
+      confirmed_at: patientConfirmedAt,
+      extraction_status: structuredData.extraction_status,
+      updated_at: patientConfirmedAt,
+    });
+    await intake.save();
+    encounter.queue_status = 'WAITING';
+    await encounter.save();
+
+    const changed = !jsonEqual(oldClinical, clinical);
     await AuditEvent.create({
       actor_type: 'PATIENT',
       actor_id: patient._id.toString(),
-      action: 'PATIENT_CONFIRMED_SYMPTOM_INTAKE',
+      action: changed ? 'PATIENT_CORRECTED_INTAKE' : 'PATIENT_CONFIRMED_SYMPTOM_INTAKE',
       resource_type: 'SymptomIntake',
       resource_id: intake._id.toString(),
       patient_id: patient._id,
       outcome: 'SUCCESS',
-      details: { input_mode: inputMode },
+      details: {
+        input_mode: inputMode,
+        changed_fields: Object.keys(clinical).filter((field) => (typeof fieldProvenance[field] === 'string' ? fieldProvenance[field] : fieldProvenance[field]?.source) === 'PATIENT_EDITED'),
+      },
     });
-
-    return res.status(201).json({ success: true, intake, encounter_id: encounter._id });
+    return res.status(200).json({ success: true, intake, encounter_id: encounter._id });
   } catch (error) {
-    console.error('Patient intake error:', error);
-    return res.status(500).json({ success: false, error: 'INTAKE_SUBMIT_FAILED' });
+    console.error('Patient intake confirmation error:', error.name || 'Error');
+    return res.status(500).json({ success: false, error: 'INTAKE_CONFIRMATION_FAILED' });
   }
+});
+
+// Legacy clients must explicitly use the prepare -> review -> confirm flow.
+router.post('/encounters/:encounterId/intake', async (req, res) => {
+  return res.status(409).json({
+    success: false,
+    error: 'INTAKE_REVIEW_REQUIRED',
+    message: 'Prepare the intake before confirming it.',
+  });
 });
 
 router.get('/encounters/:encounterId', async (req, res) => {
