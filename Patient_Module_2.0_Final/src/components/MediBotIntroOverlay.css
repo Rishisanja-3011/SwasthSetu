@@ -1,0 +1,484 @@
+/* ==========================================================================
+   VaaniDoc — MediBot Animated Robot Introduction Overlay
+   Aesthetic: CarePlus Soft Porcelain Aqua & Medical Teal Neomorphism
+   ========================================================================== */
+
+.medibot-intro-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 999999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100vw;
+  height: 100vh;
+  padding: 24px;
+  box-sizing: border-box;
+  overflow: hidden;
+  /* 100% solid, opaque background barrier to prevent any background page bleed-through */
+  background: #EBF5F8;
+  background: linear-gradient(
+    135deg,
+    #EBF5F8 0%,
+    #F4FAFC 50%,
+    #E2F1F5 100%
+  );
+  backdrop-filter: blur(16px) saturate(140%);
+  -webkit-backdrop-filter: blur(16px) saturate(140%);
+  opacity: 1;
+  pointer-events: auto;
+  transition: opacity 0.24s cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: opacity;
+}
+
+/* Revealed only after the application router has completed switching to /assistant */
+.medibot-intro-overlay.is-revealing {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* ==========================================================================
+   Decorative Background Layer (VaaniDoc Porcelain & Aqua Aesthetic)
+   ========================================================================== */
+.medibot-intro-backdrop {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 0;
+}
+
+.medibot-intro-center-glow {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 600px;
+  height: 600px;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    rgba(56, 186, 203, 0.22) 0%,
+    rgba(34, 146, 160, 0.12) 35%,
+    rgba(235, 245, 248, 0) 70%
+  );
+  filter: blur(40px);
+}
+
+.medibot-intro-ambient-arc {
+  position: absolute;
+  border-radius: 50%;
+  border: 1.5px solid rgba(255, 255, 255, 0.85);
+  box-shadow: inset 0 2px 4px rgba(255, 255, 255, 0.9),
+              0 8px 24px rgba(150, 185, 198, 0.18);
+  pointer-events: none;
+}
+
+.medibot-intro-ambient-arc.arc-tl {
+  top: -120px;
+  left: -120px;
+  width: 420px;
+  height: 420px;
+  background: radial-gradient(
+    circle,
+    rgba(255, 255, 255, 0.6) 0%,
+    rgba(226, 241, 245, 0.25) 80%
+  );
+}
+
+.medibot-intro-ambient-arc.arc-br {
+  bottom: -160px;
+  right: -160px;
+  width: 480px;
+  height: 480px;
+  background: radial-gradient(
+    circle,
+    rgba(255, 255, 255, 0.6) 0%,
+    rgba(226, 241, 245, 0.25) 80%
+  );
+}
+
+.medibot-intro-ambient-disc {
+  position: absolute;
+  border-radius: 50%;
+  background: linear-gradient(145deg, #FFFFFF, #E8F4F7);
+  box-shadow: 4px 4px 14px rgba(150, 185, 198, 0.25),
+              -4px -4px 14px rgba(255, 255, 255, 0.9);
+  pointer-events: none;
+}
+
+.medibot-intro-ambient-disc.disc-tr {
+  top: 15%;
+  right: 12%;
+  width: 70px;
+  height: 70px;
+  opacity: 0.6;
+}
+
+.medibot-intro-ambient-disc.disc-bl {
+  bottom: 18%;
+  left: 10%;
+  width: 90px;
+  height: 90px;
+  opacity: 0.5;
+}
+
+/* ==========================================================================
+   Central Content Container
+   ========================================================================== */
+.medibot-intro-container {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  max-width: 460px;
+  width: 100%;
+}
+
+/* ==========================================================================
+   Stage & Robot Presentation
+   ========================================================================== */
+.medibot-intro-stage {
+  position: relative;
+  width: 200px;
+  height: 200px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 28px;
+  animation: medibotStageEntrance 0.65s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Outer Pulsing Soft Aura */
+.medibot-intro-pulse-aura {
+  position: absolute;
+  inset: -14px;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    rgba(56, 186, 203, 0.3) 0%,
+    rgba(34, 146, 160, 0.15) 50%,
+    rgba(34, 146, 160, 0) 75%
+  );
+  filter: blur(10px);
+  animation: medibotAuraPulse 2.8s ease-in-out infinite;
+  pointer-events: none;
+}
+
+/* Subtle Glowing Ring with Light Accent */
+.medibot-intro-glow-ring {
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(56, 186, 203, 0.45);
+  box-shadow: 0 0 24px rgba(34, 146, 160, 0.28),
+              inset 0 0 16px rgba(56, 186, 203, 0.2);
+  animation: medibotRingBreathe 2.8s ease-in-out infinite;
+  pointer-events: none;
+}
+
+/* Neomorphic Porcelain Raised Podium */
+.medibot-intro-podium {
+  position: relative;
+  width: 176px;
+  height: 176px;
+  border-radius: 50%;
+  background: linear-gradient(145deg, #FFFFFF 0%, #E8F4F7 100%);
+  border: 2px solid rgba(255, 255, 255, 0.95);
+  box-shadow: 8px 8px 24px rgba(140, 180, 195, 0.38),
+              -8px -8px 24px rgba(255, 255, 255, 0.95),
+              inset 0 2px 3px rgba(255, 255, 255, 1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+/* Floating Robot Wrapper */
+.medibot-intro-robot-wrap {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: medibotGentleFloat 2.6s ease-in-out infinite alternate;
+  will-change: transform;
+}
+
+/* Robot Image */
+.medibot-intro-robot-img {
+  width: 140px;
+  height: 140px;
+  object-fit: contain;
+  display: block;
+  user-select: none;
+  pointer-events: none;
+  filter: drop-shadow(0 6px 14px rgba(34, 146, 160, 0.22));
+  transition: transform 0.2s ease;
+}
+
+/* ==========================================================================
+   Text Group
+   ========================================================================== */
+.medibot-intro-text-group {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Category / Online Status Pill */
+.medibot-intro-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 14px;
+  border-radius: var(--radius-full, 9999px);
+  background: var(--surface-raised, linear-gradient(145deg, #FFFFFF 0%, #E8F4F7 100%));
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  box-shadow: var(--neo-raised-sm, 3px 3px 8px rgba(150, 185, 198, 0.35), -3px -3px 8px rgba(255, 255, 255, 0.95));
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--hospital-blue, #2292A0);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  margin-bottom: 2px;
+  animation: medibotFadeUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.15s both;
+}
+
+.medibot-intro-pill-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background-color: #10B981;
+  box-shadow: 0 0 8px #10B981;
+  animation: medibotDotPulse 1.8s ease-in-out infinite;
+}
+
+/* Title: "Meet MediBot" */
+.medibot-intro-title {
+  margin: 0;
+  font-size: 32px;
+  font-weight: 800;
+  color: var(--main-text, #1A2D35);
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+  animation: medibotFadeUp 0.65s cubic-bezier(0.16, 1, 0.3, 1) 0.25s both;
+}
+
+.medibot-intro-name {
+  background: linear-gradient(135deg, #16626C 0%, #2292A0 50%, #38BACB 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  font-weight: 800;
+}
+
+/* Subtitle: "Your healthcare information assistant" */
+.medibot-intro-subtitle {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--muted-text, #526E7B);
+  line-height: 1.5;
+  max-width: 340px;
+  animation: medibotFadeUp 0.65s cubic-bezier(0.16, 1, 0.3, 1) 0.38s both;
+}
+
+/* Transition Indicator Dots */
+.medibot-intro-dots {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  margin-top: 14px;
+  animation: medibotFadeUp 0.65s cubic-bezier(0.16, 1, 0.3, 1) 0.5s both;
+}
+
+.medibot-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--hospital-blue, #2292A0);
+  box-shadow: 0 0 8px rgba(34, 146, 160, 0.4);
+  animation: medibotDotWave 1.4s ease-in-out infinite;
+}
+
+.medibot-dot.dot-1 {
+  animation-delay: 0s;
+}
+
+.medibot-dot.dot-2 {
+  animation-delay: 0.2s;
+}
+
+.medibot-dot.dot-3 {
+  animation-delay: 0.4s;
+}
+
+/* ==========================================================================
+   Keyframe Animations
+   ========================================================================== */
+@keyframes medibotStageEntrance {
+  0% {
+    opacity: 0;
+    transform: scale(0.85);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes medibotFadeUp {
+  0% {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes medibotGentleFloat {
+  0% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-7px);
+  }
+  100% {
+    transform: translateY(0);
+  }
+}
+
+@keyframes medibotAuraPulse {
+  0%, 100% {
+    transform: scale(0.96);
+    opacity: 0.5;
+  }
+  50% {
+    transform: scale(1.06);
+    opacity: 0.85;
+  }
+}
+
+@keyframes medibotRingBreathe {
+  0%, 100% {
+    transform: scale(0.98);
+    opacity: 0.65;
+    box-shadow: 0 0 20px rgba(34, 146, 160, 0.22);
+  }
+  50% {
+    transform: scale(1.03);
+    opacity: 0.95;
+    box-shadow: 0 0 32px rgba(56, 186, 203, 0.45);
+  }
+}
+
+@keyframes medibotDotPulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.5;
+    transform: scale(0.85);
+  }
+}
+
+@keyframes medibotDotWave {
+  0%, 100% {
+    transform: translateY(0) scale(0.9);
+    opacity: 0.35;
+  }
+  50% {
+    transform: translateY(-5px) scale(1.15);
+    opacity: 1;
+  }
+}
+
+/* ==========================================================================
+   Responsive Adaptations
+   ========================================================================== */
+@media (max-width: 640px) {
+  .medibot-intro-stage {
+    width: 170px;
+    height: 170px;
+    margin-bottom: 22px;
+  }
+
+  .medibot-intro-podium {
+    width: 150px;
+    height: 150px;
+  }
+
+  .medibot-intro-robot-img {
+    width: 118px;
+    height: 118px;
+  }
+
+  .medibot-intro-title {
+    font-size: 26px;
+  }
+
+  .medibot-intro-subtitle {
+    font-size: 14px;
+    max-width: 290px;
+  }
+
+  .medibot-intro-pill {
+    font-size: 11px;
+    padding: 4px 12px;
+  }
+}
+
+/* ==========================================================================
+   Accessibility: prefers-reduced-motion
+   ========================================================================== */
+@media (prefers-reduced-motion: reduce) {
+  .medibot-intro-stage,
+  .medibot-intro-pill,
+  .medibot-intro-title,
+  .medibot-intro-subtitle,
+  .medibot-intro-dots,
+  .medibot-intro-overlay {
+    animation: none !important;
+    transition: opacity 0.15s ease !important;
+  }
+
+  .medibot-intro-robot-wrap {
+    animation: none !important;
+    transform: none !important;
+  }
+
+  .medibot-intro-pulse-aura,
+  .medibot-intro-glow-ring,
+  .medibot-intro-pill-dot,
+  .medibot-dot {
+    animation: none !important;
+  }
+
+  .medibot-intro-overlay.is-revealing {
+    opacity: 0 !important;
+  }
+}
+
+.medibot-intro-overlay.reduced-motion {
+  animation: none !important;
+}
+
+.medibot-intro-overlay.reduced-motion .medibot-intro-robot-wrap,
+.medibot-intro-overlay.reduced-motion .medibot-intro-stage,
+.medibot-intro-overlay.reduced-motion .medibot-intro-pulse-aura,
+.medibot-intro-overlay.reduced-motion .medibot-intro-glow-ring,
+.medibot-intro-overlay.reduced-motion .medibot-dot {
+  animation: none !important;
+  transform: none !important;
+}

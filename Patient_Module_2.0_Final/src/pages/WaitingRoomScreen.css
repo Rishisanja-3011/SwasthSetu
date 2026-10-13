@@ -1,0 +1,96 @@
+/* =========================================================
+   VaaniDoc Waiting Room — Dynamic Queue Cards Entrance
+   Matches Timeline right-to-left animation style and easing
+   ========================================================= */
+
+@keyframes queueCardSlideIn {
+  0% {
+    opacity: 0;
+    transform: translateX(42px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes statusUpdateGlow {
+  0% {
+    box-shadow: 0 0 0 0 rgba(34, 146, 160, 0.45);
+    transform: scale(1);
+  }
+  50% {
+    box-shadow: 0 0 0 10px rgba(34, 146, 160, 0.12);
+    transform: scale(1.01);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(34, 146, 160, 0);
+    transform: scale(1);
+  }
+}
+
+@keyframes radarPing {
+  0% {
+    box-shadow: 0 0 0 0 rgba(34, 146, 160, 0.35);
+  }
+  70% {
+    box-shadow: 0 0 0 14px rgba(34, 146, 160, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(34, 146, 160, 0);
+  }
+}
+
+@keyframes doorPulseGlow {
+  0%, 100% {
+    box-shadow: 0 0 20px rgba(5, 150, 105, 0.25);
+  }
+  50% {
+    box-shadow: 0 0 34px rgba(5, 150, 105, 0.42);
+  }
+}
+
+/* Waiting room wrapper ensuring zero horizontal overflow during motion */
+.waiting-room-wrapper {
+  position: relative;
+  overflow-x: hidden;
+  width: 100%;
+  max-width: 860px;
+  margin: 0 auto;
+}
+
+/* Card entrance container (Right-to-Left slide + subtle fade-in) */
+.waiting-card-entrance {
+  opacity: 0;
+  animation: queueCardSlideIn 0.48s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  will-change: transform, opacity;
+}
+
+/* Subtle animation when status is dynamically updated in-place */
+.waiting-card-updated {
+  animation: statusUpdateGlow 1.2s ease-out;
+}
+
+/* Radar ping animation for waiting state icon */
+.waiting-radar-icon {
+  animation: radarPing 2.5s infinite ease-in-out;
+}
+
+/* Pulsing door card for "It's your turn" call */
+.waiting-door-card {
+  animation: doorPulseGlow 2s infinite ease-in-out;
+}
+
+/* Accessibility: Respect Reduced Motion Preferences */
+@media (prefers-reduced-motion: reduce) {
+  .waiting-card-entrance {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+  .waiting-card-updated,
+  .waiting-radar-icon,
+  .waiting-door-card {
+    animation: none !important;
+  }
+}

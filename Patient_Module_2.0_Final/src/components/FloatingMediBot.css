@@ -1,0 +1,571 @@
+/* =========================================================
+   FLOATING MEDIBOT — CAREPLUS MEDICAL TEAL & SOFT AQUA THEME
+   Visual Style: Clean White & Pale Aqua Surface, Medical Teal Launcher
+   ========================================================= */
+
+.floating-medibot {
+  --medibot-lavender: var(--hospital-blue, #2292A0);
+  --medibot-indigo: var(--deep-indigo, #16626C);
+  --medibot-teal: var(--healthcare-teal, #2292A0);
+  --medibot-bg: var(--bg-lavender-gray, #EBF5F8);
+  --medibot-text: var(--main-text, #1A2D35);
+  --medibot-muted: var(--muted-text, #526E7B);
+  --medibot-border: var(--border-subtle, rgba(255, 255, 255, 0.85));
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 1000;
+  font-family: var(--font-sans, 'Plus Jakarta Sans', sans-serif);
+}
+
+/* Floating launcher button (Gentle Medical Teal 3D Pill/Squircle) */
+.floating-medibot-launcher {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 60px;
+  height: 60px;
+  padding: 0;
+  border: 2px solid rgba(255, 255, 255, 0.85);
+  border-radius: 20px;
+  background: linear-gradient(135deg, #32B3C2 0%, #2292A0 50%, #1A7986 100%);
+  color: #ffffff;
+  box-shadow: 0 10px 28px rgba(34, 146, 160, 0.38), -4px -4px 12px rgba(255, 255, 255, 0.9), inset 0 1px 1px rgba(255, 255, 255, 0.5);
+  cursor: pointer;
+  transition: transform 200ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 200ms ease;
+  overflow: visible;
+  isolation: isolate;
+  animation: launcherGentleFloat 4s ease-in-out infinite;
+}
+
+@keyframes launcherGentleFloat {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
+.floating-medibot-launcher:hover {
+  transform: translateY(-5px) scale(1.04);
+  box-shadow: 0 14px 34px rgba(34, 146, 160, 0.48), -5px -5px 14px rgba(255, 255, 255, 1);
+  animation-play-state: paused;
+}
+
+.floating-medibot-launcher:active {
+  transform: translateY(-1px) scale(0.97);
+}
+
+.floating-medibot-launcher:focus-visible,
+.floating-medibot-icon-button:focus-visible {
+  outline: 3px solid var(--hospital-blue);
+  outline-offset: 3px;
+}
+
+/* Robot image: confined to launcher dimensions */
+.floating-medibot-launcher .floating-medibot-robot {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: cover;
+  object-position: center top;
+  border-radius: inherit;
+  pointer-events: none;
+  transition: transform 220ms ease;
+}
+
+.floating-medibot-launcher:hover .floating-medibot-robot {
+  transform: scale(1.03);
+}
+
+/* Notification badge */
+.floating-medibot-badge {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border: 2px solid #ffffff;
+  border-radius: 50%;
+  background: #e11d48;
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: 800;
+  display: none;
+}
+
+/* Chat panel (Clean White & Pale Aqua Floating Dialog) */
+.floating-medibot-panel {
+  position: absolute;
+  right: 0;
+  bottom: 78px;
+  display: flex;
+  flex-direction: column;
+  width: 380px;
+  height: min(560px, calc(100dvh - 120px));
+  overflow: hidden;
+  background: linear-gradient(145deg, #FFFFFF 0%, #EBF5F8 100%);
+  border: 1px solid var(--medibot-border);
+  border-radius: 20px;
+  box-shadow: 14px 14px 36px rgba(140, 180, 195, 0.42), -14px -14px 36px rgba(255, 255, 255, 0.95);
+  animation: floatingMediBotOpen 180ms ease-out;
+}
+
+@keyframes floatingMediBotOpen {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Header */
+.floating-medibot-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 18px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.95) 0%, rgba(235, 245, 248, 0.95) 100%);
+  border-bottom: 1px solid var(--medibot-border);
+}
+
+.floating-medibot-heading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.floating-medibot-heading strong {
+  display: block;
+  color: var(--medibot-text);
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.floating-medibot-online {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 3px;
+  color: var(--medibot-muted);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.floating-medibot-online > span {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--medibot-teal);
+  box-shadow: 0 0 0 2px rgba(34, 146, 160, 0.18);
+}
+
+.floating-medibot-avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  overflow: hidden;
+  border-radius: 12px;
+  background: var(--surface-raised, #EBF5F8);
+  color: var(--hospital-blue);
+  border: 1px solid var(--medibot-border);
+  box-shadow: var(--neo-raised-sm);
+}
+
+.floating-medibot-avatar .floating-medibot-robot {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  border-radius: inherit;
+}
+
+.floating-medibot-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.floating-medibot-icon-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--medibot-muted);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.floating-medibot-icon-button:hover {
+  background: var(--surface-raised, #EBF5F8);
+  color: var(--hospital-blue);
+  box-shadow: var(--neo-raised-sm);
+}
+
+.floating-medibot-icon-button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Messages area */
+.floating-medibot-messages {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 16px;
+  background: var(--medibot-bg);
+  scroll-behavior: smooth;
+}
+
+.floating-medibot-welcome {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 24px 10px;
+  text-align: center;
+}
+
+.floating-medibot-welcome-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  overflow: hidden;
+  border-radius: 16px;
+  background: var(--surface-raised, #EBF5F8);
+  color: var(--hospital-blue);
+  border: 1px solid var(--medibot-border);
+  box-shadow: var(--neo-raised-md);
+}
+
+.floating-medibot-welcome-icon .floating-medibot-robot {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  border-radius: inherit;
+}
+
+.floating-medibot-welcome h3 {
+  margin: 14px 0 6px;
+  color: var(--medibot-text);
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.floating-medibot-welcome p {
+  max-width: 270px;
+  margin: 0 0 16px;
+  color: var(--medibot-muted);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.floating-medibot-welcome button {
+  width: 100%;
+  max-width: 270px;
+  margin-top: 8px;
+  padding: 10px 14px;
+  border: 1px solid var(--medibot-border);
+  border-radius: 10px;
+  background: var(--surface-raised, #FFFFFF);
+  color: var(--hospital-blue);
+  font-size: 12px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.16s ease;
+  box-shadow: var(--neo-raised-sm);
+}
+
+.floating-medibot-welcome button:hover {
+  background: linear-gradient(145deg, #FFFFFF, #E8F4F7);
+  border-color: rgba(255, 255, 255, 1);
+  transform: translateY(-1px);
+  box-shadow: var(--neo-raised-md);
+}
+
+/* Chat bubbles */
+.floating-medibot-message {
+  max-width: 88%;
+  margin-bottom: 12px;
+  padding: 10px 14px;
+  border-radius: 14px;
+  overflow-wrap: anywhere;
+  font-size: 12.5px;
+  line-height: 1.6;
+  animation: medibotMsgEntrance 220ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes medibotMsgEntrance {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.floating-medibot-message p {
+  margin: 0 0 8px;
+}
+
+.floating-medibot-message p:last-child {
+  margin-bottom: 0;
+}
+
+.floating-medibot-message h1,
+.floating-medibot-message h2,
+.floating-medibot-message h3 {
+  margin: 8px 0 5px;
+  color: inherit;
+  font-size: 13.5px;
+  font-weight: 700;
+}
+
+.floating-medibot-message ul,
+.floating-medibot-message ol {
+  padding-left: 18px;
+  margin: 6px 0;
+}
+
+/* User Message: Gentle Medical Teal 3D Bubble */
+.floating-medibot-message.user {
+  margin-left: auto;
+  background: linear-gradient(135deg, #32B3C2 0%, #2292A0 50%, #1A7986 100%);
+  color: #ffffff;
+  border-bottom-right-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  box-shadow: 0 4px 14px rgba(34, 146, 160, 0.32), -2px -2px 6px rgba(255, 255, 255, 0.85);
+}
+
+.floating-medibot-message.user h1,
+.floating-medibot-message.user h2,
+.floating-medibot-message.user h3 {
+  color: #ffffff;
+}
+
+/* Assistant Message: Clean White & Pale Aqua Bubble */
+.floating-medibot-message.assistant {
+  margin-right: auto;
+  border: 1px solid var(--medibot-border);
+  background: var(--surface-raised, #FFFFFF);
+  color: var(--medibot-text);
+  border-bottom-left-radius: 4px;
+  box-shadow: var(--neo-raised-sm);
+}
+
+/* Thinking animation */
+.floating-medibot-dots {
+  color: var(--medibot-muted);
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.floating-medibot-dots .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: var(--hospital-blue);
+  display: inline-block;
+  animation: medibotDotBounce 1.2s infinite ease-in-out both;
+}
+
+.floating-medibot-dots .dot:nth-child(1) {
+  animation-delay: -0.32s;
+}
+
+.floating-medibot-dots .dot:nth-child(2) {
+  animation-delay: -0.16s;
+}
+
+@keyframes medibotDotBounce {
+  0%, 80%, 100% {
+    transform: scale(0);
+    opacity: 0.3;
+  }
+  40% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* Error message */
+.floating-medibot-error {
+  padding: 10px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  border-radius: 12px;
+  background: var(--status-danger-bg, #FEECEB);
+  color: var(--status-danger-text, #DC2626);
+  font-size: 12px;
+  line-height: 1.5;
+  box-shadow: var(--neo-raised-sm);
+}
+
+.floating-medibot-error button {
+  display: inline-block;
+  margin-top: 6px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--status-danger-text, #DC2626);
+  font-size: 12px;
+  font-weight: 700;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+/* Input area (Recessed Aqua Inset Well) */
+.floating-medibot-input-area {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 14px;
+  border-top: 1px solid var(--medibot-border);
+  background: linear-gradient(180deg, rgba(235, 245, 248, 0.95) 0%, rgba(255, 255, 255, 0.95) 100%);
+}
+
+.floating-medibot-input-area input {
+  flex: 1;
+  width: 0;
+  min-width: 0;
+  padding: 10px 14px;
+  border: 1.5px solid var(--border-medium, #C2DFE7) !important;
+  border-radius: 12px !important;
+  outline: none;
+  color: var(--medibot-text) !important;
+  font: inherit;
+  font-size: 13.5px;
+  background: #F4FAFC !important;
+  box-shadow: inset 2px 2px 5px rgba(140, 180, 195, 0.28), inset -2px -2px 5px rgba(255, 255, 255, 0.95) !important;
+  transition: border-color 220ms ease, box-shadow 220ms ease, background-color 220ms ease;
+}
+
+.floating-medibot-input-area input:focus {
+  border-color: var(--hospital-blue) !important;
+  background: #FFFFFF !important;
+  box-shadow: inset 1px 1px 3px rgba(140, 180, 195, 0.16), inset -1px -1px 3px rgba(255, 255, 255, 0.95), 0 0 0 3.5px rgba(34, 146, 160, 0.18) !important;
+}
+
+.floating-medibot-input-area input::placeholder {
+  color: var(--medibot-muted, #526E7B);
+  opacity: 0.85;
+  font-weight: 450;
+}
+
+.floating-medibot-input-area button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 38px;
+  height: 38px;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: 10px;
+  background: linear-gradient(135deg, #2EADC0 0%, #2292A0 55%, #197B88 100%);
+  color: #ffffff;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(34, 146, 160, 0.32), inset 0 1px 1px rgba(255, 255, 255, 0.6);
+  transition: transform 200ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 200ms ease, background 200ms ease, opacity 200ms ease;
+}
+
+.floating-medibot-input-area button:hover:not(:disabled) {
+  transform: translateY(-1.5px) scale(1.02);
+  background: linear-gradient(135deg, #38BACB 0%, #2292A0 45%, #1A7A86 100%);
+  box-shadow: 0 6px 18px rgba(34, 146, 160, 0.42), inset 0 1px 1px rgba(255, 255, 255, 0.7);
+}
+
+.floating-medibot-input-area button:active:not(:disabled) {
+  transform: translateY(0.5px) scale(0.97);
+  box-shadow: 0 2px 6px rgba(34, 146, 160, 0.28), inset 0 1px 2px rgba(0, 0, 0, 0.15);
+}
+
+.floating-medibot-input-area button:focus-visible {
+  outline: 2px solid var(--hospital-blue);
+  outline-offset: 2px;
+}
+
+.floating-medibot-input-area button:disabled {
+  opacity: 0.42;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+  background: linear-gradient(135deg, #B5D2D8 0%, #9EBEC5 100%);
+  border-color: transparent;
+}
+
+.floating-medibot-disclaimer {
+  margin: 0;
+  padding: 0 10px 10px;
+  background: #ffffff;
+  color: var(--medibot-muted);
+  font-size: 10px;
+  text-align: center;
+  line-height: 1.4;
+}
+
+/* Mobile layout */
+@media (max-width: 480px) {
+  .floating-medibot {
+    right: 14px;
+    bottom: 84px;
+  }
+
+  .floating-medibot-launcher {
+    width: 54px;
+    height: 54px;
+    border-radius: 18px;
+  }
+
+  .floating-medibot-panel {
+    position: fixed;
+    right: 12px;
+    bottom: 80px;
+    left: 12px;
+    width: auto;
+    height: min(540px, calc(100dvh - 110px));
+    max-height: calc(100dvh - 110px);
+    border-radius: 18px;
+  }
+}
+
+/* Accessibility */
+@media (prefers-reduced-motion: reduce) {
+  .floating-medibot-panel,
+  .floating-medibot-dots span {
+    animation: none;
+  }
+
+  .floating-medibot-launcher {
+    transition: none;
+  }
+}

@@ -1,0 +1,64 @@
+/* =========================================================
+   VaaniDoc Timeline — Soft 3D Neomorphic List Animation
+   Smooth, polished entrance matching healthcare SaaS aesthetics
+   ========================================================= */
+
+@keyframes timelineCardSlideIn {
+  0% {
+    opacity: 0;
+    transform: translateX(42px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes timelineMarkerEnter {
+  0% {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+  70% {
+    opacity: 1;
+    transform: scale(1.08);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Timeline wrapper ensuring zero horizontal overflow during motion */
+.timeline-content-wrapper {
+  position: relative;
+  padding-left: 24px;
+  overflow-x: hidden;
+  padding-right: 4px;
+}
+
+/* Card entrance container (Right-to-Left slide + subtle fade-in) */
+.timeline-card-entrance {
+  opacity: 0;
+  animation: timelineCardSlideIn 0.48s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  will-change: transform, opacity;
+}
+
+/* Marker circle entrance (Soft 3D neomorphic raised bead) */
+.timeline-marker-animate {
+  opacity: 0;
+  animation: timelineMarkerEnter 0.42s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  will-change: transform, opacity;
+  box-shadow: 2px 2px 6px rgba(150, 185, 198, 0.35), -2px -2px 6px rgba(255, 255, 255, 0.95);
+  border: 1.5px solid rgba(255, 255, 255, 0.95);
+}
+
+/* Accessibility: Respect Reduced Motion Preferences */
+@media (prefers-reduced-motion: reduce) {
+  .timeline-card-entrance,
+  .timeline-marker-animate {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+}

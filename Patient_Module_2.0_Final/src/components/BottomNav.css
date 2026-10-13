@@ -1,0 +1,83 @@
+/* =========================================================
+   VaaniDoc Bottom Navigation — CarePlus Medical Teal & Soft Aqua
+   ========================================================= */
+
+.patient-bottom-nav {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  width: 100%;
+  max-width: 100%;
+  height: 68px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96) 0%, rgba(235, 245, 248, 0.96) 100%);
+  border-top: 1px solid var(--border-subtle);
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  padding: 0 8px;
+  z-index: 99;
+  backdrop-filter: blur(14px);
+  box-shadow: 0 -6px 20px rgba(150, 185, 198, 0.28), inset 0 1px 1px rgba(255, 255, 255, 0.95);
+}
+
+@media (min-width: 768px) {
+  .patient-bottom-nav {
+    display: none !important;
+  }
+}
+
+.nav-tab-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  color: var(--muted-text);
+  text-decoration: none;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: var(--radius-sm);
+  transition: all 0.15s ease;
+  position: relative;
+}
+
+.nav-tab-item:hover {
+  color: var(--hospital-blue);
+  background: var(--surface-raised);
+  box-shadow: var(--neo-raised-sm);
+}
+
+.nav-tab-item.active {
+  color: var(--hospital-blue);
+  font-weight: 700;
+  background: var(--surface-raised);
+  box-shadow: 2px 2px 6px rgba(150, 185, 198, 0.3), -2px -2px 6px rgba(255, 255, 255, 0.95), inset 0 1px 1px rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.9);
+}
+
+.nav-tab-item.active::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  width: 24px;
+  height: 3px;
+  background-color: var(--hospital-blue);
+  border-radius: 0 0 3px 3px;
+  box-shadow: 0 1px 4px rgba(34, 146, 160, 0.4);
+}
+
+.nav-tab-icon {
+  width: 20px;
+  height: 20px;
+  transition: transform 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.nav-tab-item:hover .nav-tab-icon {
+  transform: translateY(-1px);
+}
+
+.nav-tab-item:active .nav-tab-icon {
+  transform: scale(0.92);
+}

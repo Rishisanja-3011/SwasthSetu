@@ -1,0 +1,230 @@
+/* =========================================================
+   VaaniDoc Navbar — CarePlus Medical Teal & Soft Aqua Theme
+   Visual Style: Clean White & Pale Aqua Header, Inset Nav Well, Raised Active Pills
+   ========================================================= */
+
+.patient-navbar {
+  width: 100%;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96) 0%, rgba(235, 245, 248, 0.96) 100%);
+  border-bottom: 1px solid var(--border-subtle);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  backdrop-filter: blur(14px);
+  box-shadow: 0 4px 18px rgba(150, 185, 198, 0.25), inset 0 -1px 1px rgba(255, 255, 255, 0.9);
+}
+
+.navbar-inner {
+  max-width: 1240px;
+  width: 100%;
+  height: 70px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+}
+
+@media (max-width: 767px) {
+  .navbar-inner {
+    padding: 0 16px;
+    height: 64px;
+  }
+}
+
+/* Desktop & Tablet Navigation Pill (Recessed Inset Well) */
+.navbar-desktop-nav {
+  display: none;
+}
+
+@media (min-width: 768px) {
+  .navbar-desktop-nav {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    background-color: var(--surface-inset);
+    padding: 4px 6px;
+    border-radius: var(--radius-full);
+    border: 1px solid var(--border-subtle);
+    box-shadow: var(--neo-inset-sm);
+  }
+
+  .desktop-nav-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 7px 15px;
+    border-radius: var(--radius-full);
+    color: var(--muted-text);
+    text-decoration: none;
+    font-size: 0.84rem;
+    font-weight: 600;
+    transition: all 0.16s ease;
+  }
+
+  .desktop-nav-link:hover {
+    color: var(--main-text);
+    background-color: rgba(255, 255, 255, 0.6);
+  }
+
+  .desktop-nav-link.active {
+    background: var(--surface-raised);
+    color: var(--hospital-blue);
+    font-weight: 700;
+    box-shadow: 2px 2px 6px rgba(150, 185, 198, 0.3), -2px -2px 6px rgba(255, 255, 255, 0.95), inset 0 1px 1px rgba(255, 255, 255, 0.9);
+    border: 1px solid rgba(255, 255, 255, 0.9);
+  }
+
+  .desktop-nav-link.active.is-blue {
+    color: var(--hospital-blue);
+  }
+}
+
+.brand-section {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-decoration: none;
+}
+
+.brand-icon-box {
+  width: 40px;
+  height: 40px;
+  background: linear-gradient(135deg, #32B3C2 0%, #2292A0 50%, #1A7986 100%);
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  box-shadow: 3px 3px 8px rgba(34, 146, 160, 0.35), -2px -2px 6px rgba(255, 255, 255, 0.9), inset 0 1px 1px rgba(255, 255, 255, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.35);
+}
+
+.brand-icon-box.is-saas {
+  background: linear-gradient(135deg, #32B3C2 0%, #16626C 100%);
+  box-shadow: 3px 3px 8px rgba(22, 98, 108, 0.35), -2px -2px 6px rgba(255, 255, 255, 0.9), inset 0 1px 1px rgba(255, 255, 255, 0.4);
+}
+
+.brand-title-wrap {
+  display: flex;
+  flex-direction: column;
+}
+
+.brand-name {
+  font-size: 1.2rem;
+  font-weight: 800;
+  color: var(--main-text);
+  line-height: 1.1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  letter-spacing: -0.02em;
+}
+
+.brand-version {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--hospital-blue);
+  background-color: var(--surface-inset);
+  padding: 1px 6px;
+  border-radius: 6px;
+  border: 1px solid var(--border-subtle);
+  box-shadow: var(--neo-inset-sm);
+}
+
+.brand-subtitle {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--muted-text);
+  letter-spacing: 0.02em;
+}
+
+.navbar-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* Doctor Workspace Quick Toggle Button (Medical Teal Pill) */
+.doctor-view-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border-radius: var(--radius-full);
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-decoration: none;
+  background: var(--surface-raised);
+  color: var(--deep-indigo);
+  border: 1px solid var(--border-subtle);
+  box-shadow: var(--neo-raised-sm);
+  transition: all 0.16s ease;
+}
+
+.doctor-view-btn:hover {
+  background: linear-gradient(145deg, #FFFFFF, #E8F4F7);
+  color: var(--hospital-blue);
+  box-shadow: var(--neo-raised-md);
+  transform: translateY(-1px);
+}
+
+.doctor-view-btn.active {
+  background: linear-gradient(135deg, #32B3C2 0%, #1A7986 100%);
+  color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.3);
+  box-shadow: 0 4px 14px rgba(34, 146, 160, 0.35), -2px -2px 6px rgba(255, 255, 255, 0.85);
+}
+
+/* Patient Switcher Badge Button (Soft 3D Raised Pill) */
+.patient-badge-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--surface-raised);
+  border: 1px solid var(--border-subtle);
+  padding: 5px 12px;
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  box-shadow: var(--neo-raised-sm);
+}
+
+.patient-badge-btn:hover {
+  background: linear-gradient(145deg, #FFFFFF, #E8F4F7);
+  box-shadow: var(--neo-raised-md);
+  transform: translateY(-1px);
+}
+
+.patient-avatar {
+  width: 28px;
+  height: 28px;
+  background: linear-gradient(135deg, #32B3C2 0%, #2292A0 100%);
+  color: #ffffff;
+  border-radius: 50%;
+  font-size: 0.78rem;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 6px rgba(34, 146, 160, 0.25);
+}
+
+.patient-info-min {
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+}
+
+.patient-name-min {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--main-text);
+  line-height: 1.1;
+}
+
+.patient-id-min {
+  font-size: 0.68rem;
+  font-family: var(--font-mono);
+  color: var(--muted-text);
+}
