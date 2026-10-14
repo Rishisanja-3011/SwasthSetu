@@ -15,3 +15,8 @@
 .intake-recording-ready { margin-top: 14px; color: var(--teal-700); font-size: .8rem; font-weight: 700; }
 @keyframes intakeWave { 50% { height: 24px; } }
 @media (max-width: 580px) { .intake-languages { grid-template-columns: 1fr 1fr; } }
+.typewriter-guidance-container { display: flex; justify-content: center; min-height: 28px; margin-top: 8px; }
+.typewriter-guidance-content { display: inline-flex; align-items: center; justify-content: center; max-width: 100%; }
+.typewriter-text { color: var(--teal-700); font-weight: 600; }
+.typewriter-cursor { width: 2px; height: 1.1em; margin-left: 3px; background: var(--teal-600); animation: typewriterBlink .9s infinite; }
+@keyframes typewriterBlink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }

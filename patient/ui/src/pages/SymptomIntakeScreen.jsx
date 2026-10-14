@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { patientApi } from '../services/patientApi';
 import { usePatient } from '../context/PatientContext';
+import TypewriterGuidance from '../components/TypewriterGuidance';
 import './SymptomIntakeScreen.css';
 
 const LANGUAGES = [
@@ -296,7 +297,7 @@ export function SymptomIntakeScreen() {
             <h4 role="status" style={{ fontSize: '1.1rem', color: 'var(--navy-900)', marginBottom: 4 }}>{isRecording ? `Recording (${recordingSeconds}s)...` : isStopping ? 'Finishing recording…' : 'Tap to Speak Symptoms'}</h4>
             {isRecording && <div className="intake-wave" aria-hidden="true">{Array.from({ length: 7 }, (_, index) => <span key={index} style={{ animationDelay: `${index * .12}s` }} />)}</div>}
             <p style={{ fontSize: '0.84rem', color: 'var(--slate-500)', maxWidth: 430, margin: '0 auto' }}>
-              {isRecording ? 'Tap again when finished. The server will use the browser transcript when reliable, otherwise it will transcribe the audio.' : `Example: “${selectedLanguage.sample}”`}
+               {isRecording ? 'Tap again when finished. The server will use the browser transcript when reliable, otherwise it will transcribe the audio.' : <><span>Example: “{selectedLanguage.sample}”</span><span className="typewriter-guidance-container"><TypewriterGuidance active /></span></>}
             </p>
             {(micDenied || speechUnavailable) && <div style={{ marginTop: 14, color: '#9a3412', fontSize: '0.8rem' }}><AlertCircle size={15} style={{ verticalAlign: 'middle', marginRight: 4 }} />Browser support is limited; a recorded audio file can still use server transcription when configured.</div>}
             {audioBlob?.size > 0 && !isRecording && !isStopping && <p className="intake-recording-ready" role="status">Audio captured. Ready for your review.</p>}
