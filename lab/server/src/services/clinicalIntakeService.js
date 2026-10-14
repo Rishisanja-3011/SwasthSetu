@@ -104,7 +104,7 @@ const NEGATION_PATTERNS = [
 const ALLERGY_NEGATIVE_PATTERNS = [
   /no known allergies?/i,
   /no allergies?/i,
-  /not allergic/i,
+  /\bnot allergic(?:\s+to anything)?\s*(?:[.!?;]|$)/i,
   /મને કોઈ એલર્જી નથી/u,
   /કોઈ એલર્જી નથી/u,
   /कोई एलर्जी नहीं/u,
@@ -152,7 +152,8 @@ function includesPattern(text, pattern) {
 }
 
 function isNegated(text, matchIndex, matchLength = 0) {
-  const prefix = text.slice(Math.max(0, matchIndex - 42), matchIndex);
+  const prefix = text.slice(Math.max(0, matchIndex - 80), matchIndex)
+    .split(/[.!?;\n।]|\bbut\b|\bhowever\b|પરંતુ|लेकिन|\band\s+(?:i\s+)?(?:have|am)\b/iu).pop();
   const negationIndex = NEGATION_PATTERNS.reduce((latest, pattern) => {
     const flags = pattern.flags.includes('g') ? pattern.flags : `${pattern.flags}g`;
     const matches = [...prefix.matchAll(new RegExp(pattern.source, flags))];
@@ -162,7 +163,7 @@ function isNegated(text, matchIndex, matchLength = 0) {
   if (negationIndex >= 0) {
     const afterNegation = prefix.slice(negationIndex);
     if (afterNegation.includes('\u092a\u0923') || afterNegation.includes('\u0aaa\u0aa3')) return false;
-    if (!/(?:\band\b|\bbut\b|અને|પરંતુ|और|लेकिन|आणि|પण)/iu.test(afterNegation)) return true;
+    if (!/(?:અને|और|आणि)/u.test(afterNegation)) return true;
   }
 
   // In several supported languages the negative particle follows the
@@ -179,6 +180,8 @@ function findPatternIndex(text, pattern) {
     const match = new RegExp(pattern.source, flags).exec(text);
     return match ? match.index : -1;
   }
+  // English phrases must be words: "rash" in "crash" is not a symptom.
+  if (/^[a-z ]+$/i.test(pattern)) return text.search(new RegExp(`\\b${pattern}\\b`, 'i'));
   return text.toLocaleLowerCase().indexOf(pattern.toLocaleLowerCase());
 }
 
@@ -214,9 +217,9 @@ function normalizeDurationNumber(value) {
 }
 
 function extractDuration(text) {
-  const lower = text.toLocaleLowerCase();
+  const lower = text.toLocaleLowerCase().replace(/[૦-૯०-९]/gu, (digit) => String(digit.charCodeAt(0) - (digit >= '૦' ? 0x0AE6 : 0x0966)));
   const numeric = /(?:for|since|past|last|થી|से|पासून)\s+(?:the\s+)?(\d+|one|two|three|four|five|six|એક|બે|ત્રણ|ચાર|પાંચ|एक|दो|तीन|चार|पांच|पाँच)\s*(day|days|week|weeks|month|months|દિવસ|દિવસથી|दिन|दिवस|दिवसांपासून)/iu.exec(lower);
-  const regionalDuration = /(\d+|one|two|three|four|five|six|એક|બે|ત્રણ|ચાર|પાંચ|एक|दो|तीन|चार|पांच|पाँच)\s*(day|days|week|weeks|month|months|દિવસ|દિવસથી|दिन|दિવસ|દિવસांपासून)/iu.exec(lower);
+  const regionalDuration = /(\d+|one|two|three|four|five|six|એક|બે|ત્રણ|ચાર|પાંચ|एक|दो|तीन|चार|पांच|पाँच)\s*(day|days|week|weeks|month|months|દિવસ|દિવસથી|दिन|दिवस|दिवसांपासून)/iu.exec(lower);
   const matchedDuration = numeric || regionalDuration;
   if (matchedDuration) {
     const number = normalizeDurationNumber(matchedDuration[1]);
@@ -229,12 +232,11 @@ function extractDuration(text) {
 }
 
 function extractAllergies(text) {
+  const allergies = extractNamedValues(text, ALLERGY_PATTERNS);
+  if (allergies.length) return { allergies, allergyStatus: 'REPORTED' };
   if (ALLERGY_NEGATIVE_PATTERNS.some((pattern) => pattern.test(text))) {
     return { allergies: [], allergyStatus: 'NONE_REPORTED' };
   }
-  const allergies = ALLERGY_PATTERNS
-    .filter(([, pattern]) => pattern.test(text))
-    .map(([value]) => value);
   return {
     allergies: cleanList(allergies),
     allergyStatus: allergies.length ? 'REPORTED' : 'UNKNOWN',
@@ -242,18 +244,20 @@ function extractAllergies(text) {
 }
 
 function extractNamedValues(text, patterns) {
-  return cleanList(patterns.filter(([, pattern]) => pattern.test(text)).map(([value]) => value));
+  return cleanList(patterns.filter(([, pattern]) => {
+    const match = pattern.exec(text);
+    return match && !isNegated(text, match.index, match[0].length);
+  }).map(([value]) => value));
 }
 
-function extractUrgency(text, symptoms) {
-  if (/(?:call an ambulance|emergency|cannot breathe|can't breathe|શ્વાસ લઈ શકતો નથી|सांस नहीं ले पा रहा|श्वास घेता येत नाही)/iu.test(text)) return 'EMERGENCY';
-  if (/(?:severe|very severe|ખૂબ જ|તીવ્ર|बहुत तेज|बहुत ज्यादा|तीव्र|अत्यंत)/iu.test(text)
-    || symptoms.includes('difficulty breathing')
-    || symptoms.includes('chest pain')
-    || symptoms.includes('bleeding')) return 'HIGH';
-  if (/(?:moderate|મધ્યમ|मध्यम)/iu.test(text)) return 'MODERATE';
-  if (/(?:mild|slight|હળવો|हल्का|सौम्य)/iu.test(text)) return 'LOW';
-  return '';
+function extractUrgency(text) {
+  // Severity is an explicit statement, not a triage inference from symptoms.
+  return extractNamedValues(text, [
+    ['EMERGENCY', /(?:\bcall an ambulance\b|\bemergency\b|\bcannot breathe\b|\bcan't breathe\b|શ્વાસ લઈ શકતો નથી|सांस नहीं ले पा रहा|श्वास घेता येत नाही)/iu],
+    ['HIGH', /(?:\bsevere\b|ખૂબ જ|તીવ્ર|बहुत तेज|बहुत ज्यादा|तीव्र|अत्यंत)/iu],
+    ['MODERATE', /(?:\bmoderate\b|મધ્યમ|मध्यम)/iu],
+    ['LOW', /(?:\bmild\b|\bslight\b|હળવો|हल्का|सौम्य)/iu],
+  ])[0] || '';
 }
 
 function numberOrZero(value) {
@@ -297,9 +301,14 @@ function extractClinicalFields(text) {
     allergy_status: allergies.allergyStatus,
     urgency: extractUrgency(text, symptomData.symptoms),
   };
-  const hasExplicitInformation = Boolean(
+  return { clinical, hasExplicitInformation: hasClinicalInformation(clinical) };
+}
+
+function hasClinicalInformation(clinical) {
+  return Boolean(
     clinical.chief_complaint
       || clinical.duration
+      || clinical.symptoms.length
       || clinical.negative_symptoms.length
       || clinical.relevant_history.length
       || clinical.medications.length
@@ -307,7 +316,6 @@ function extractClinicalFields(text) {
       || clinical.allergy_status === 'NONE_REPORTED'
       || clinical.urgency,
   );
-  return { clinical, hasExplicitInformation };
 }
 
 function buildFieldProvenance(clinical, source) {
@@ -405,7 +413,14 @@ function parseJsonResponseText(value) {
 }
 
 function extractGeminiText(payload) {
-  return payload?.candidates?.[0]?.content?.parts?.map((part) => part.text || '').join('') || '';
+  const parts = payload?.candidates?.[0]?.content?.parts;
+  return Array.isArray(parts) ? parts.map((part) => typeof part?.text === 'string' ? part.text : '').join('') : '';
+}
+
+function isClinicalIntakeObject(value) {
+  return Boolean(value && typeof value === 'object' && !Array.isArray(value)
+    && Object.entries(EMPTY_CLINICAL_INTAKE).every(([key, empty]) => value[key] === undefined
+      || (Array.isArray(empty) ? Array.isArray(value[key]) && value[key].every((item) => typeof item === 'string') : typeof value[key] === 'string')));
 }
 
 function sanitizeProviderClinical(value) {
@@ -438,7 +453,7 @@ async function tryGeminiClinicalExtraction(text, selectedLanguage) {
     if (!response.ok) return null;
     const payload = await response.json().catch(() => null);
     const parsed = parseJsonResponseText(extractGeminiText(payload));
-    if (!parsed || !parsed.clinical_intake) return null;
+    if (!parsed || !isClinicalIntakeObject(parsed.clinical_intake)) return null;
     return {
       clinical: sanitizeProviderClinical(parsed.clinical_intake),
       confidence: Object.fromEntries(Object.entries(parsed.confidence || {}).map(([key, value]) => [key, clampConfidence(value)])),
@@ -457,14 +472,17 @@ async function processClinicalIntake(options) {
   const providerResult = await tryGeminiClinicalExtraction(options.text, fallback.selected_language);
   if (!providerResult) return fallback;
 
-  const structured = buildClinicalIntake({
-    ...options,
-    structuredSource: 'AI_EXTRACTED',
-    structuredConfidence: providerResult.confidence,
-  });
+  const structured = fallback;
   structured.clinical_intake = providerResult.clinical;
+  structured.confidence = buildConfidence(providerResult.clinical, fallback.confidence.transcription, fallback.confidence.language);
+  for (const key of Object.keys(structured.confidence)) {
+    if (!['transcription', 'language'].includes(key) && Object.hasOwn(providerResult.confidence, key)) {
+      structured.confidence[key] = providerResult.confidence[key];
+    }
+  }
+  structured.provenance.structured_fields = 'AI_EXTRACTED';
   structured.provenance.field_provenance = buildFieldProvenance(providerResult.clinical, 'AI_EXTRACTED');
-  structured.extraction_status = Object.values(providerResult.clinical).some((value) => Array.isArray(value) ? value.length > 0 : Boolean(value))
+  structured.extraction_status = hasClinicalInformation(providerResult.clinical)
     ? 'READY'
     : 'REVIEW_REQUIRED';
   return structured;
@@ -506,6 +524,7 @@ module.exports = {
   buildClinicalIntake,
   processClinicalIntake,
   sanitizeClinicalIntake,
+  isClinicalIntakeObject,
   URGENCY_VALUES,
   ALLERGY_STATUS_VALUES,
 };

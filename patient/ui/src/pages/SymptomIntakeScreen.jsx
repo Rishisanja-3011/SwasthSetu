@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { patientApi } from '../services/patientApi';
 import { usePatient } from '../context/PatientContext';
+import './SymptomIntakeScreen.css';
 
 const LANGUAGES = [
   { code: 'gu', speechCode: 'gu-IN', name: 'Gujarati (ગુજરાતી)', sample: 'મને ત્રણ દિવસથી ખૂબ જ કમજોરી લાગે છે અને ચક્કર પણ આવે છે.' },
@@ -38,7 +39,8 @@ export function SymptomIntakeScreen() {
   const recorderRef = useRef(null);
   const recognitionRef = useRef(null);
   const streamRef = useRef(null);
-  const audioChunksRef = useRef([]);
+  const recordingSessionRef = useRef(0);
+  const pendingMicrophoneRef = useRef(false);
 
   useEffect(() => {
     if (!doctor) navigate('/');
@@ -58,44 +60,65 @@ export function SymptomIntakeScreen() {
   }, [isRecording, recordingSeconds]);
 
   useEffect(() => () => {
+    recordingSessionRef.current += 1;
+    pendingMicrophoneRef.current = false;
     recognitionRef.current?.stop?.();
+    if (recorderRef.current?.state === 'recording') recorderRef.current.stop();
     streamRef.current?.getTracks?.().forEach((track) => track.stop());
   }, []);
 
   if (!doctor) return null;
 
   const handleStartVoice = async () => {
+    if (isRecording || isStopping || isStructuring || pendingMicrophoneRef.current) return;
+    const session = ++recordingSessionRef.current;
+    const isCurrentSession = () => session === recordingSessionRef.current;
+    const audioChunks = [];
+    pendingMicrophoneRef.current = true;
     setErrorMessage('');
     setMicDenied(false);
     setSpeechUnavailable(false);
     setTranscript('');
     setInterimTranscript('');
     setAudioBlob(null);
-    audioChunksRef.current = [];
     setIsRecording(true);
 
     try {
       if (navigator.mediaDevices?.getUserMedia && window.MediaRecorder) {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        // Permission may resolve after Stop, mode change, or navigation away.
+        if (!isCurrentSession()) {
+          stream.getTracks().forEach((track) => track.stop());
+          return;
+        }
         streamRef.current = stream;
         const recorder = new MediaRecorder(stream);
         recorderRef.current = recorder;
         recorder.ondataavailable = (event) => {
-          if (event.data?.size) audioChunksRef.current.push(event.data);
+          if (event.data?.size) audioChunks.push(event.data);
         };
         recorder.onstop = () => {
           const type = recorder.mimeType || 'audio/webm';
-          setAudioBlob(new Blob(audioChunksRef.current, { type }));
-          setIsStopping(false);
           stream.getTracks().forEach((track) => track.stop());
-          streamRef.current = null;
+          if (!isCurrentSession()) return;
+          const blob = new Blob(audioChunks, { type });
+          setAudioBlob(blob.size ? blob : null);
+          setIsStopping(false);
+          recorderRef.current = null;
+          if (streamRef.current === stream) streamRef.current = null;
         };
         recorder.start();
       }
     } catch (error) {
+      if (!isCurrentSession()) return;
+      streamRef.current?.getTracks?.().forEach((track) => track.stop());
+      streamRef.current = null;
+      recorderRef.current = null;
       setMicDenied(true);
       setErrorMessage('Microphone access was not available. If browser speech recognition works, you can still submit its transcript or switch to text.');
     }
+    if (!isCurrentSession()) return;
+    pendingMicrophoneRef.current = false;
 
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (SpeechRecognition) {
@@ -105,6 +128,7 @@ export function SymptomIntakeScreen() {
         recognition.continuous = true;
         recognition.interimResults = true;
         recognition.onresult = (event) => {
+          if (!isCurrentSession()) return;
           let finalText = '';
           let interimText = '';
           for (let index = 0; index < event.results.length; index += 1) {
@@ -115,34 +139,48 @@ export function SymptomIntakeScreen() {
           setInterimTranscript(interimText);
         };
         recognition.onerror = (event) => {
+          if (!isCurrentSession()) return;
           if (event.error === 'not-allowed') setMicDenied(true);
           if (event.error !== 'aborted') setSpeechUnavailable(true);
+        };
+        recognition.onend = () => {
+          if (!isCurrentSession()) return;
+          recognitionRef.current = null;
+          if (!recorderRef.current) setIsRecording(false);
         };
         recognitionRef.current = recognition;
         recognition.start();
       } catch (error) {
+        recognitionRef.current = null;
         setSpeechUnavailable(true);
       }
     } else {
       setSpeechUnavailable(true);
     }
+    if (!recorderRef.current && !recognitionRef.current) {
+      setIsRecording(false);
+      setErrorMessage('Voice capture is unavailable in this browser. Please use Text Input to continue.');
+    }
   };
 
   const handleStopVoice = () => {
-    setIsStopping(true);
+    if (pendingMicrophoneRef.current) {
+      recordingSessionRef.current += 1;
+      pendingMicrophoneRef.current = false;
+    }
     recognitionRef.current?.stop?.();
     recognitionRef.current = null;
     const recorder = recorderRef.current;
+    setIsStopping(Boolean(recorder && recorder.state === 'recording'));
     if (recorder?.state === 'recording') recorder.stop();
-    recorderRef.current = null;
     streamRef.current?.getTracks?.().forEach((track) => track.stop());
     streamRef.current = null;
     setIsRecording(false);
-    if (!recorder) setIsStopping(false);
   };
 
   const handleModeChange = (mode) => {
-    if (isRecording || isStopping) handleStopVoice();
+    if (isStopping || isStructuring) return;
+    if (isRecording) handleStopVoice();
     setInputMode(mode);
     setErrorMessage('');
   };
@@ -150,12 +188,13 @@ export function SymptomIntakeScreen() {
   const getEncounter = async () => patientApi.createEncounter({ doctor, visitType });
 
   const handleProcessIntake = async () => {
+    if (isRecording || isStopping || isStructuring) return;
     const text = inputMode === 'text' ? textInput : transcript;
     if (inputMode === 'text' && !text.trim()) {
       setErrorMessage('Please type your original statement before continuing.');
       return;
     }
-    if (inputMode === 'voice' && !text.trim() && !audioBlob) {
+    if (inputMode === 'voice' && !text.trim() && !audioBlob?.size) {
       setErrorMessage('Please record or transcribe your statement before continuing.');
       return;
     }
@@ -207,12 +246,13 @@ export function SymptomIntakeScreen() {
   };
 
   return (
-    <div className="fade-in page-centered-container" style={{ maxWidth: 700, padding: '8px 0' }}>
+    <div className="fade-in page-centered-container symptom-intake" style={{ maxWidth: 720, padding: '8px 0' }}>
       <button onClick={() => navigate('/visit-type', { state: { doctor } })} className="btn btn-secondary" style={{ padding: '6px 12px', fontSize: '0.8rem', marginBottom: 16 }}>
         <ArrowLeft size={14} /> Back
       </button>
 
-      <div style={{ textAlign: 'center', marginBottom: 20 }}>
+      <div className="page-heading intake-heading" style={{ textAlign: 'center', marginBottom: 20 }}>
+        <span className="page-eyebrow">Your voice. Your words. Your care.</span>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginBottom: 6 }}>
           <span className="status-pill active" style={{ fontSize: '0.7rem' }}>{visitType === 'NEW' ? 'Mandatory Intake' : 'Optional Intake'}</span>
           <span style={{ fontSize: '0.78rem', color: 'var(--slate-500)', fontFamily: 'var(--font-mono)' }}>{doctor.name}</span>
@@ -223,12 +263,12 @@ export function SymptomIntakeScreen() {
         </p>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, backgroundColor: 'var(--slate-100)', padding: 4, borderRadius: 12, marginBottom: 20 }}>
+      <div className="intake-mode-switch" role="group" aria-label="Symptom input method">
         {[
           ['voice', <Mic size={18} />, 'Voice Input'],
           ['text', <Type size={18} />, 'Text Input'],
         ].map(([mode, icon, label]) => (
-          <button key={mode} type="button" onClick={() => handleModeChange(mode)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '10px 0', borderRadius: 10, border: 'none', backgroundColor: inputMode === mode ? '#ffffff' : 'transparent', color: inputMode === mode ? 'var(--teal-700)' : 'var(--slate-600)', fontWeight: 700, fontSize: '0.9rem', cursor: 'pointer', boxShadow: inputMode === mode ? 'var(--shadow-sm)' : 'none' }}>
+          <button key={mode} type="button" aria-pressed={inputMode === mode} disabled={isStopping || isStructuring} onClick={() => handleModeChange(mode)}>
             {icon} {label}
           </button>
         ))}
@@ -238,9 +278,9 @@ export function SymptomIntakeScreen() {
         <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--slate-600)', display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
           <Globe size={14} /> Preferred language (a recognition hint, not a restriction)
         </label>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+        <div className="intake-languages" role="group" aria-label="Preferred recognition language">
           {LANGUAGES.map((language) => (
-            <button key={language.code} type="button" onClick={() => setSelectedLanguage(language)} style={{ padding: '8px 10px', borderRadius: 8, fontSize: '0.8rem', textAlign: 'left', border: selectedLanguage.code === language.code ? '2px solid var(--teal-500)' : '1px solid var(--border-medium)', backgroundColor: selectedLanguage.code === language.code ? 'var(--teal-50)' : '#ffffff', color: selectedLanguage.code === language.code ? 'var(--teal-900)' : 'var(--slate-700)', fontWeight: selectedLanguage.code === language.code ? 700 : 500, cursor: 'pointer' }}>
+            <button key={language.code} type="button" aria-pressed={selectedLanguage.code === language.code} disabled={isRecording || isStopping || isStructuring} onClick={() => setSelectedLanguage(language)}>
               {language.name}
             </button>
           ))}
@@ -249,28 +289,30 @@ export function SymptomIntakeScreen() {
 
       {inputMode === 'voice' ? (
         <div>
-          <div className="v-card" style={{ textAlign: 'center', padding: '28px 20px', marginBottom: 20, border: isRecording ? '2px solid var(--teal-500)' : '1px solid var(--border-subtle)' }}>
-            <button type="button" onClick={isRecording ? handleStopVoice : handleStartVoice} disabled={isStructuring} style={{ width: 90, height: 90, borderRadius: '50%', backgroundColor: isRecording ? '#dc2626' : 'var(--teal-500)', color: '#ffffff', border: 'none', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', boxShadow: 'var(--shadow-glow)', marginBottom: 14 }}>
+          <div className={`v-card intake-voice-card ${isRecording ? 'is-recording' : ''}`}>
+            <button type="button" className="intake-mic-button" aria-label={isRecording ? 'Stop recording symptoms' : 'Start recording symptoms'} onClick={isRecording ? handleStopVoice : handleStartVoice} disabled={isStructuring || isStopping}>
               {isRecording ? <MicOff size={40} /> : <Mic size={42} />}
             </button>
-            <h4 style={{ fontSize: '1.1rem', color: 'var(--navy-900)', marginBottom: 4 }}>{isRecording ? `Recording (${recordingSeconds}s)...` : 'Tap to Speak Symptoms'}</h4>
+            <h4 role="status" style={{ fontSize: '1.1rem', color: 'var(--navy-900)', marginBottom: 4 }}>{isRecording ? `Recording (${recordingSeconds}s)...` : isStopping ? 'Finishing recording…' : 'Tap to Speak Symptoms'}</h4>
+            {isRecording && <div className="intake-wave" aria-hidden="true">{Array.from({ length: 7 }, (_, index) => <span key={index} style={{ animationDelay: `${index * .12}s` }} />)}</div>}
             <p style={{ fontSize: '0.84rem', color: 'var(--slate-500)', maxWidth: 430, margin: '0 auto' }}>
               {isRecording ? 'Tap again when finished. The server will use the browser transcript when reliable, otherwise it will transcribe the audio.' : `Example: “${selectedLanguage.sample}”`}
             </p>
             {(micDenied || speechUnavailable) && <div style={{ marginTop: 14, color: '#9a3412', fontSize: '0.8rem' }}><AlertCircle size={15} style={{ verticalAlign: 'middle', marginRight: 4 }} />Browser support is limited; a recorded audio file can still use server transcription when configured.</div>}
+            {audioBlob?.size > 0 && !isRecording && !isStopping && <p className="intake-recording-ready" role="status">Audio captured. Ready for your review.</p>}
           </div>
           {(transcript || interimTranscript) && <div className="v-card" style={{ padding: 16, marginBottom: 20, backgroundColor: 'var(--slate-50)' }}><span className="provenance-tag patient">{transcript ? 'PATIENT_SPOKEN_TRANSCRIPT' : 'TRANSCRIPT_IN_PROGRESS'}</span><p style={{ fontSize: '0.94rem', color: 'var(--navy-900)', fontStyle: 'italic', lineHeight: 1.5, marginTop: 8 }}>&quot;{transcript || interimTranscript}&quot;</p>{!transcript && <p style={{ fontSize: '0.74rem', color: 'var(--slate-500)', marginTop: 7 }}>Only final browser speech segments are submitted as a transcript.</p>}</div>}
-          <button type="button" className="btn btn-primary btn-block btn-lg" disabled={isStructuring || isRecording || isStopping || (!transcript.trim() && !audioBlob)} onClick={handleProcessIntake}>
+          <button type="button" className="btn btn-primary btn-block btn-lg" disabled={isStructuring || isRecording || isStopping || (!transcript.trim() && !audioBlob?.size)} onClick={handleProcessIntake}>
             <Sparkles size={18} /> {isStructuring ? 'Preparing review...' : 'Review Structured Intake'}
           </button>
         </div>
       ) : (
         <div>
           <div className="v-card" style={{ padding: 18, marginBottom: 20 }}>
-            <label style={{ fontSize: '0.86rem', fontWeight: 700, color: 'var(--navy-900)', display: 'block', marginBottom: 8 }}>Your original statement</label>
-            <textarea rows={5} value={textInput} onChange={(event) => setTextInput(event.target.value)} placeholder="Describe what you are experiencing, in any supported language..." style={{ width: '100%', padding: '12px 14px', borderRadius: 10, border: '1px solid var(--border-medium)', fontFamily: 'var(--font-sans)', fontSize: '0.94rem', lineHeight: 1.5, resize: 'vertical' }} />
+            <label htmlFor="original-statement" style={{ fontSize: '0.86rem', fontWeight: 700, color: 'var(--navy-900)', display: 'block', marginBottom: 8 }}>Your original statement</label>
+            <textarea id="original-statement" rows={5} value={textInput} disabled={isStructuring} onChange={(event) => setTextInput(event.target.value)} placeholder="Describe what you are experiencing, in any supported language..." style={{ width: '100%', padding: '12px 14px', borderRadius: 10, border: '1px solid var(--border-medium)', fontFamily: 'var(--font-sans)', fontSize: '0.94rem', lineHeight: 1.5, resize: 'vertical' }} />
           </div>
-          <button type="button" className="btn btn-primary btn-block btn-lg" disabled={isStructuring || !textInput.trim()} onClick={handleProcessIntake}><Sparkles size={18} /> {isStructuring ? 'Preparing review...' : 'Structure & Review Symptoms'}</button>
+          <button type="button" className="btn btn-primary btn-block btn-lg" disabled={isStructuring || isStopping || !textInput.trim()} onClick={handleProcessIntake}><Sparkles size={18} /> {isStructuring ? 'Preparing review...' : 'Structure & Review Symptoms'}</button>
         </div>
       )}
 

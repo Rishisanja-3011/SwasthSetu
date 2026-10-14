@@ -17,9 +17,9 @@ function normalizeLanguage(value, fallback = null) {
   if (typeof value !== 'string') return fallback;
   const normalized = value.trim().toLowerCase().replace(/_/g, '-');
   if (!normalized) return fallback;
-  return LANGUAGE_ALIASES[normalized]
-    || LANGUAGE_ALIASES[normalized.split('-', 1)[0]]
-    || fallback;
+  const base = normalized.split('-', 1)[0];
+  if (Object.hasOwn(LANGUAGE_ALIASES, normalized)) return LANGUAGE_ALIASES[normalized];
+  return Object.hasOwn(LANGUAGE_ALIASES, base) ? LANGUAGE_ALIASES[base] : fallback;
 }
 
 const scriptMatchers = [
@@ -33,8 +33,8 @@ const scriptMatchers = [
   ['pa', /[\u0A00-\u0A7F]/g],
 ];
 
-const MARATHI_CUES = /(मला|माझे|माझा|आहे|पासून|दिवस|ताप|अंगदुखी|डोकेदुखी|मळमळ|खोकला|घसा|दुखत|होत)/iu;
-const HINDI_CUES = /(मुझे|मेरा|मेरी|है|से|दिन|बुखार|दर्द|चक्कर|खांसी|सांस|गले|उल्टी)/iu;
+const MARATHI_CUES = /(?<![\p{L}\p{M}])(?:मला|माझे|माझा|आहे|पासून|दिवस|ताप|अंगदुखी|डोकेदुखी|मळमळ|खोकला|घसा|दुखत|होत)(?![\p{L}\p{M}])/iu;
+const HINDI_CUES = /(?<![\p{L}\p{M}])(?:मुझे|मेरा|मेरी|है|से|दिन|बुखार|दर्द|चक्कर|खांसी|सांस|गले|उल्टी)(?![\p{L}\p{M}])/iu;
 const ENGLISH_CUES = /\b(i|have|has|my|the|for|since|days?|weeks?|fever|pain|cough|headache|dizzy|weakness|allergy)\b/i;
 
 function countMatches(text, matcher) {

@@ -7,15 +7,18 @@ import { NetworkStatusBanner } from './components/NetworkStatusBanner';
 import { AppRoutes } from './routes/AppRoutes';
 import { usePatient } from './context/PatientContext';
 import FloatingMediBot from './components/FloatingMediBot';
+import { BackgroundEffect } from './components/BackgroundEffect';
 
 function AppShell() {
   const { isAuthenticated } = usePatient();
 
   return (
     <div className="app-container">
+      <BackgroundEffect />
+      <a className="skip-link" href="#patient-main">Skip to content</a>
       {isAuthenticated && <Navbar />}
       <NetworkStatusBanner />
-      <main className="main-content">
+      <main id="patient-main" className="main-content" tabIndex={-1}>
         <AppRoutes />
       </main>
       {isAuthenticated && <BottomNav />}

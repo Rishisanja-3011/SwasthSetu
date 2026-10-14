@@ -97,16 +97,16 @@ export function IntakeReviewScreen() {
   return (
     <div className="fade-in page-centered-container" style={{ maxWidth: 1040, padding: '8px 0' }}>
       <button onClick={() => navigate(-1)} className="btn btn-secondary" style={{ padding: '6px 12px', fontSize: '0.8rem', marginBottom: 16 }}><ArrowLeft size={14} /> Back</button>
-      <div style={{ textAlign: 'center', marginBottom: 22 }}>
+      <div className="page-heading" style={{ textAlign: 'center', marginBottom: 22 }}>
         <span style={{ fontSize: '0.74rem', fontWeight: 700, color: 'var(--teal-700)', backgroundColor: 'var(--teal-50)', padding: '4px 12px', borderRadius: 20, display: 'inline-block', marginBottom: 8 }}>Patient review required</span>
         <h2 style={{ fontSize: '1.4rem', color: 'var(--navy-900)', marginBottom: 4 }}>Review Your Clinical Intake</h2>
         <p style={{ fontSize: '0.86rem', color: 'var(--slate-600)' }}>Verify the English normalized fields before they reach <strong>{doctor.name}</strong>. Missing information is intentionally left blank.</p>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1.25fr)', gap: 18 }}>
+      <div className="intake-review-grid">
         <div>
           <div className="v-card" style={{ padding: 18, marginBottom: 16, borderLeft: '4px solid #3b82f6' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, marginBottom: 10 }}><strong>Original statement</strong><span className="provenance-tag patient">{structuredRoot.transcript?.source || 'PATIENT_REPORTED'}</span></div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', gap: 10, marginBottom: 10 }}><strong>Original statement</strong><span className="provenance-tag patient">{structuredRoot.transcript?.source || 'PATIENT_REPORTED'}</span></div>
             <div style={{ padding: '14px 16px', minHeight: 100, borderRadius: 9, backgroundColor: '#f8fafc', border: '1px dashed var(--slate-300)', fontSize: '0.92rem', lineHeight: 1.55, fontStyle: transcript ? 'italic' : 'normal' }}>{transcript ? `“${transcript}”` : EMPTY}</div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 14 }}>
               <Field label="Input language" value={structuredRoot.selected_language || intake.language} />

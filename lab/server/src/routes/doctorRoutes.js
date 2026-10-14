@@ -465,7 +465,7 @@ router.post('/encounter/:encounterId/order-diagnostic', async (req, res) => {
       test_type: testType,
       clinical_notes: clinicalNotes || 'Routine diagnostic evaluation',
       status: 'ORDERED',
-      }], { session });
+      }], { session, ordered: true });
       await Notification.create([{
       doctor_id: req.doctor._id,
       encounter_id: encounter._id,
@@ -475,13 +475,13 @@ router.post('/encounter/:encounterId/order-diagnostic', async (req, res) => {
       message: `${req.doctor.name} ordered ${order.test_type} for this consultation. You can take this order to a registered laboratory.`,
       visit_type: encounter.visit_type,
       diagnostic_order_id: order._id,
-      }], { session });
+      }], { session, ordered: true });
       await AuditEvent.create([{
         actor_type: 'DOCTOR', actor_id: String(req.doctor._id),
         action: 'DIAGNOSTIC_ORDER_CREATED', resource_type: 'DiagnosticOrder',
         resource_id: String(order._id), patient_id: encounter.patient_id._id,
         outcome: 'SUCCESS', details: { encounter_id: String(encounter._id), test_type: order.test_type },
-      }], { session });
+      }], { session, ordered: true });
     });
 
     return res.status(201).json({ success: true, order });

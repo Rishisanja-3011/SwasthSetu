@@ -1,18 +1,19 @@
 .patient-navbar {
   width: 100%;
-  background-color: var(--bg-card);
+  background: linear-gradient(180deg, rgba(255, 255, 255, .96), rgba(235, 245, 248, .96));
   border-bottom: 1px solid var(--border-subtle);
   position: sticky;
   top: 0;
   z-index: 100;
   backdrop-filter: blur(8px);
-  box-shadow: 0 1px 3px rgba(10, 37, 64, 0.03);
+  box-shadow: 0 4px 18px rgba(150, 185, 198, .25), inset 0 -1px 1px #fff;
 }
 
 .navbar-inner {
-  max-width: 1200px;
+  max-width: 1240px;
   width: 100%;
-  height: 64px;
+  height: 70px;
+  gap: 16px;
   margin: 0 auto;
   display: flex;
   align-items: center;
@@ -23,6 +24,7 @@
 @media (max-width: 767px) {
   .navbar-inner {
     padding: 0 16px;
+    height: 64px;
   }
 }
 
@@ -36,7 +38,8 @@
     display: flex;
     align-items: center;
     gap: 4px;
-    background-color: var(--slate-100);
+    background-color: var(--surface-inset);
+    box-shadow: var(--neo-inset-sm);
     padding: 4px 6px;
     border-radius: var(--radius-full);
     border: 1px solid var(--border-subtle);
@@ -46,7 +49,7 @@
     display: inline-flex;
     align-items: center;
     gap: 7px;
-    padding: 6px 14px;
+    padding: 8px 14px;
     border-radius: var(--radius-full);
     color: var(--slate-600);
     text-decoration: none;
@@ -61,10 +64,10 @@
   }
 
   .desktop-nav-link.active {
-    background-color: #ffffff;
+    background: var(--surface-raised);
     color: var(--teal-700);
     font-weight: 700;
-    box-shadow: 0 2px 6px rgba(10, 37, 64, 0.08);
+    box-shadow: var(--shadow-sm);
   }
 }
 
@@ -78,7 +81,7 @@
 .brand-icon-box {
   width: 38px;
   height: 38px;
-  background: linear-gradient(135deg, var(--teal-500) 0%, var(--teal-600) 100%);
+  background: var(--brand-gradient);
   border-radius: 10px;
   display: flex;
   align-items: center;
@@ -145,7 +148,8 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  background-color: var(--slate-50);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-sm);
   border: 1px solid var(--border-subtle);
   padding: 5px 10px;
   border-radius: var(--radius-full);
@@ -175,9 +179,13 @@
   display: flex;
   flex-direction: column;
   text-align: left;
+  max-width: 150px;
 }
 
 .patient-name-min {
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
   font-size: 0.8rem;
   font-weight: 700;
   color: var(--navy-900);
@@ -197,4 +205,17 @@
   border-radius: 50%;
   display: inline-block;
   box-shadow: 0 0 6px rgba(16, 185, 129, 0.6);
+}
+
+@media (min-width: 768px) and (max-width: 1050px) {
+  .navbar-inner { gap: 10px; padding: 0 18px; }
+  .desktop-nav-link { padding: 8px 10px; font-size: .78rem; }
+  .patient-info-min { display: none; }
+  .brand-section { gap: 8px; }
+}
+@media (max-width: 520px) {
+  .patient-info-min { display: none; }
+  .navbar-right { gap: 8px; }
+  .patient-badge-btn { min-height: 40px; padding: 5px 8px; }
+  .patient-notification-panel { position: fixed; top: 68px; right: 16px; }
 }

@@ -5,7 +5,6 @@ import {
   AlertTriangle,
   ShieldCheck,
   ShieldAlert,
-  ArrowRight,
   ArrowLeft,
   Edit3,
   Lock,
@@ -16,13 +15,17 @@ import {
   UploadCloud,
   Check,
 } from 'lucide-react';
+import { DemoReportSelector } from './DemoReportSelector';
 
 export default function ReportDetailView({
   report,
   observations,
   patient,
+  identity,
   order,
   grantStatus,
+  grantKey,
+  existingReportId,
   isProcessing,
   isPublishing,
   onUploadReport,
@@ -39,6 +42,7 @@ export default function ReportDetailView({
   const [editRefHigh, setEditRefHigh] = useState('');
   const [editReason, setEditReason] = useState('Manual verification against hematology analyzer display');
   const [isSavingEdit, setIsSavingEdit] = useState(false);
+  const [editError, setEditError] = useState('');
 
   // Local state for Publish Confirmation Modal (Screen #6)
   const [isPublishModalOpen, setIsPublishModalOpen] = useState(false);
@@ -49,13 +53,83 @@ export default function ReportDetailView({
   // File upload state for unextracted visits
   const [selectedFile, setSelectedFile] = useState(null);
 
-  const hasNeedsReview = observations?.some((o) => o.validation_status === 'NEEDS_REVIEW');
-  const unresolvedCount = observations?.filter((o) => o.validation_status === 'NEEDS_REVIEW').length || 0;
+  const observationList = Array.isArray(observations) ? observations : [];
+  const hasObservationReview = observationList.some((o) => (
+    o.validation_status !== 'OK' || !Number.isFinite(o.value)
+  ));
+  const unresolvedCount = observationList.filter((o) => (
+    o.validation_status !== 'OK' || !Number.isFinite(o.value)
+  )).length;
   const isPublished = report?.status === 'PUBLISHED';
   const isExtractionPending = report && !['PROCESSING', 'NEEDS_REVIEW', 'PUBLISHED'].includes(report.status);
+  const normalizeBlocker = (reason) => {
+    const code = String(reason);
+    if (code.startsWith('VALIDATION_')) return `EXTRACTION_${code}`;
+    if (code.startsWith('COVERAGE_')) return `EXTRACTION_${code}`;
+    return code;
+  };
+  const reportBlockers = (Array.isArray(report?.publish_blocking_reasons)
+    ? report.publish_blocking_reasons
+    : []).map(normalizeBlocker);
+  const validationStatus = report?.extraction_validation?.status;
+  const coverageStatus = report?.extraction_coverage?.status;
+  const validationBlocker = report && validationStatus !== 'VALID'
+    ? `EXTRACTION_VALIDATION_${validationStatus || 'MISSING'}`
+    : null;
+  const coverageBlocker = report && coverageStatus !== 'COMPLETE'
+    ? `EXTRACTION_COVERAGE_${coverageStatus || 'MISSING'}`
+    : null;
+  const hasInvalidObservationValue = observationList.some((o) => !Number.isFinite(o.value));
+  const hasSpecificReviewBlocker = Boolean(
+    reportBlockers.length
+      || validationBlocker
+      || coverageBlocker
+      || hasObservationReview
+      || observationList.length === 0,
+  );
+  const publishBlockers = [
+    ...reportBlockers,
+    validationBlocker,
+    coverageBlocker,
+    ...(observationList.some((o) => o.validation_status !== 'OK') ? ['OBSERVATION_REVIEW_REQUIRED'] : []),
+    ...(hasInvalidObservationValue ? ['OBSERVATION_VALUE_INVALID'] : []),
+    ...(report?.extraction_review_required && !hasSpecificReviewBlocker ? ['EXTRACTION_REVIEW_REQUIRED'] : []),
+    ...(report && observationList.length === 0 ? ['NO_OBSERVATIONS'] : []),
+    ...(report && grantStatus !== 'ACTIVE' && !isPublished ? ['BOUNDED_ACCESS_EXPIRED'] : []),
+  ].filter(Boolean).filter((reason, index, reasons) => reasons.indexOf(reason) === index);
+  const hasStructuralReview = Boolean(
+    report && (
+      validationBlocker
+      || coverageBlocker
+      || report.extraction_review_required
+      || observationList.length === 0
+      || reportBlockers.some((reason) => reason.startsWith('EXTRACTION_'))
+    ),
+  );
+
+  const formatBlocker = (reason) => {
+    const code = String(reason);
+    if (code === 'EXTRACTION_VALIDATION_MISSING') return 'Extraction validation metadata is missing.';
+    if (code.startsWith('EXTRACTION_VALIDATION_')) {
+      const status = code.replace('EXTRACTION_VALIDATION_', '').replaceAll('_', ' ').toLowerCase();
+      return `Extraction validation is ${status} (${code}).`;
+    }
+    if (code === 'EXTRACTION_COVERAGE_MISSING') return 'CBC marker coverage metadata is missing.';
+    if (code.startsWith('EXTRACTION_COVERAGE_')) {
+      const status = code.replace('EXTRACTION_COVERAGE_', '').replaceAll('_', ' ').toLowerCase();
+      return `CBC marker coverage is ${status} (${code}).`;
+    }
+    if (code === 'OBSERVATION_REVIEW_REQUIRED') return 'One or more observations still require review.';
+    if (code === 'OBSERVATION_VALUE_INVALID') return 'One or more observations do not contain a valid numeric value.';
+    if (code === 'NO_OBSERVATIONS') return 'No validated observations are available for publication.';
+    if (code === 'BOUNDED_ACCESS_EXPIRED') return 'The patient access grant has expired.';
+    if (code === 'EXTRACTION_REVIEW_REQUIRED') return 'Structural extraction review is not complete.';
+    return code.replaceAll('_', ' ').toLowerCase().replace(/^./, (letter) => letter.toUpperCase());
+  };
 
   // Open edit modal
   const handleStartEdit = (obs) => {
+    setEditError('');
     setEditingObs(obs);
     setEditValue(obs.value);
     setEditUnit(obs.unit);
@@ -74,21 +148,31 @@ export default function ReportDetailView({
     if (!editingObs) return;
 
     setIsSavingEdit(true);
-    await onUpdateObservation(editingObs._id, {
-      value: parseFloat(editValue),
-      unit: editUnit,
-      reference_low: editRefLow !== '' ? parseFloat(editRefLow) : null,
-      reference_high: editRefHigh !== '' ? parseFloat(editRefHigh) : null,
-      edit_reason: editReason,
-    });
-    setIsSavingEdit(false);
-    setEditingObs(null);
+    setEditError('');
+    try {
+      const result = await onUpdateObservation(editingObs._id, {
+        value: parseFloat(editValue),
+        unit: editUnit,
+        reference_low: editRefLow !== '' ? parseFloat(editRefLow) : null,
+        reference_high: editRefHigh !== '' ? parseFloat(editRefHigh) : null,
+        edit_reason: editReason,
+      });
+      if (result?.success === true || result === true) {
+        setEditingObs(null);
+      } else {
+        setEditError(result?.error || 'Review failed. The observation was not changed.');
+      }
+    } catch (error) {
+      setEditError(error.message || 'Review failed. The observation was not changed.');
+    } finally {
+      setIsSavingEdit(false);
+    }
   };
 
   // Confirm publish
   const handleConfirmPublish = async () => {
-    await onPublishReport(signOffNotes);
-    setIsPublishModalOpen(false);
+    const result = await onPublishReport(signOffNotes);
+    if (result?.success === true || result === true) setIsPublishModalOpen(false);
   };
 
   const handleFileChange = (e) => {
@@ -109,11 +193,45 @@ export default function ReportDetailView({
     });
   };
 
+  const selectDemoReport = (file) => setSelectedFile({ ...file });
+
   // =========================================================================
   // STATE 1: UPLOAD REPORT & PROCESSING (SCREEN #4)
   // If no report has been uploaded/extracted yet for this visit
   // =========================================================================
   if (!report) {
+    if (existingReportId) {
+      return (
+        <div className="clinical-card" style={{ textAlign: 'center', padding: '3rem 1.25rem' }}>
+          <Clock size={28} color="var(--teal-700)" style={{ marginBottom: '0.75rem' }} />
+          <h2 style={{ fontSize: '1.15rem', color: 'var(--text-main)', marginBottom: '0.45rem' }}>
+            Loading preserved report
+          </h2>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', maxWidth: '34rem', margin: '0 auto' }}>
+            This access grant already has a preserved report. Report details are loading; another upload is unavailable.
+          </p>
+          <button className="btn-clinical outline" style={{ marginTop: '1.25rem' }} onClick={onBackToDashboard}>
+            Return to Dashboard
+          </button>
+        </div>
+      );
+    }
+
+    if (grantStatus !== 'ACTIVE') {
+      return (
+        <div className="clinical-card" style={{ textAlign: 'center', padding: '3rem 1rem' }}>
+          <ShieldAlert size={28} color="var(--status-expired-text)" style={{ marginBottom: '0.75rem' }} />
+          <h2 style={{ fontSize: '1.15rem', color: 'var(--text-main)', marginBottom: '0.4rem' }}>Laboratory access expired</h2>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+            Patient identity and report upload are unavailable after this grant expires.
+          </p>
+          <button className="btn-clinical outline" style={{ marginTop: '1rem' }} onClick={onBackToDashboard}>
+            Return to Dashboard
+          </button>
+        </div>
+      );
+    }
+
     return (
       <div>
         {/* Navigation Breadcrumb */}
@@ -149,9 +267,9 @@ export default function ReportDetailView({
               <div className="label">Patient Name</div>
               <div className="val">{patient?.name || 'Identity unavailable'}</div>
             </div>
-            <div className="identity-field-card">
-              <div className="label">Age & Gender</div>
-              <div className="val">{patient?.age || 32} yrs · {patient?.gender || 'Male'}</div>
+              <div className="identity-field-card">
+                <div className="label">Age & Gender</div>
+                <div className="val">{patient?.age != null ? `${patient.age} yrs` : 'Age unavailable'} · {patient?.gender || 'Gender unavailable'}</div>
             </div>
             <div className="identity-field-card">
               <div className="label">Test Type</div>
@@ -212,6 +330,7 @@ export default function ReportDetailView({
             </div>
           ) : (
             <div>
+              <DemoReportSelector identity={identity || patient} onSelect={selectDemoReport} />
               {/* File Chooser Box */}
               <div
                 style={{
@@ -224,6 +343,7 @@ export default function ReportDetailView({
                 }}
               >
                 <input
+                  key={grantKey || 'no-grant'}
                   type="file"
                   id="report-file-input-reports"
                   accept=".pdf"
@@ -297,7 +417,7 @@ export default function ReportDetailView({
             {isPublished ? 'Published Report' : 'Extraction Review'}
           </h2>
           <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-            Complete Blood Count (CBC) · Patient: {patient?.name || report?.patient_id?.name || 'Identity unavailable'}
+            Complete Blood Count (CBC) · Patient: {patient?.name || 'Identity unavailable'}
           </p>
         </div>
 
@@ -349,19 +469,35 @@ export default function ReportDetailView({
         </div>
       )}
 
-      {/* Needs Review Blocking Banner (Screen #5) */}
-      {!isPublished && hasNeedsReview && (
+      {/* Report and access blockers */}
+      {!isPublished && publishBlockers.length > 0 && (
         <div className="info-banner warning" style={{ marginBottom: '1.25rem' }}>
           <AlertTriangle size={20} style={{ flexShrink: 0, marginTop: '2px' }} />
           <div style={{ flex: 1 }}>
             <div style={{ fontWeight: 700, fontSize: '0.92rem' }}>
-              NEEDS_REVIEW — Publishing Disabled
+              {hasObservationReview
+                ? 'NEEDS_REVIEW — Publishing Disabled'
+                : hasStructuralReview
+                  ? 'STRUCTURAL REVIEW — Publishing Disabled'
+                  : 'Publishing Disabled'}
             </div>
             <div style={{ fontSize: '0.82rem', marginTop: '0.2rem' }}>
-              One or more observations are marked <code>NEEDS_REVIEW</code>. Per clinical safety rules, publishing is disabled until all flagged observations are reviewed and confirmed/corrected.
-            </div>
-          </div>
-        </div>
+              Publication requires an active grant, complete validated extraction, and at least one validated observation.
+               <ul style={{ margin: '0.45rem 0 0 1.1rem' }}>
+                 {publishBlockers.map((reason) => <li key={reason}>{formatBlocker(reason)}</li>)}
+               </ul>
+               {hasObservationReview ? (
+                 <div style={{ marginTop: '0.55rem' }}>
+                   Use <strong>Fix &amp; Verify</strong> on each flagged observation. The original PDF stays preserved while the audited correction is saved.
+                 </div>
+               ) : (
+                 <div style={{ marginTop: '0.55rem' }}>
+                    No observations are currently flagged. Structural extraction review is still required; the preserved report cannot be replaced under the same access grant. Resolve the structural blocker with a new grant or a fresh demo fixture.
+                 </div>
+               )}
+             </div>
+           </div>
+         </div>
       )}
 
       {/* Preserved Original Report File Notice (Section #5) */}
@@ -383,7 +519,7 @@ export default function ReportDetailView({
           <FileText size={18} color="var(--teal-700)" />
           <div>
             <div style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-main)' }}>
-              Preserved Original File: <span style={{ fontFamily: 'var(--font-mono)' }}>{report?.original_file_name || 'CBC_Report_Rahul_Sharma.pdf'}</span>
+              Preserved Original File: <span style={{ fontFamily: 'var(--font-mono)' }}>{report?.original_file_name || 'Original report file'}</span>
             </div>
             <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
               Original laboratory document preserved without modification. Patient can access original report in VaaniDoc.
@@ -416,9 +552,13 @@ export default function ReportDetailView({
               </span>
             ) : isExtractionPending ? (
               <span className="badge-pill low">Extraction Pending</span>
-            ) : hasNeedsReview ? (
+            ) : hasObservationReview ? (
               <span className="badge-pill review">
                 <AlertTriangle size={12} /> {unresolvedCount} Needs Review
+              </span>
+            ) : hasStructuralReview ? (
+              <span className="badge-pill review">
+                <AlertTriangle size={12} /> Structural Review
               </span>
             ) : (
               <span className="badge-pill normal">
@@ -443,14 +583,18 @@ export default function ReportDetailView({
             </thead>
             <tbody>
               {observations?.map((obs) => {
-                const isItemNeedsReview = obs.validation_status === 'NEEDS_REVIEW';
+                const isItemNeedsReview = obs.validation_status !== 'OK' || !Number.isFinite(obs.value);
 
                 // Status Flag badge
-                let flagBadge = <span className="badge-pill normal">NORMAL</span>;
-                if (obs.flag === 'LOW') {
+                let flagBadge;
+                if (obs.flag === 'NORMAL') {
+                  flagBadge = <span className="badge-pill normal">NORMAL</span>;
+                } else if (obs.flag === 'LOW') {
                   flagBadge = <span className="badge-pill low">LOW</span>;
                 } else if (obs.flag === 'HIGH') {
                   flagBadge = <span className="badge-pill high">HIGH</span>;
+                } else {
+                  flagBadge = <span className="badge-pill neutral">NOT DETERMINED</span>;
                 }
 
                 return (
@@ -532,7 +676,7 @@ export default function ReportDetailView({
           }}
         >
           <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
-            Signing Pathologist: <strong>{activeStaff?.name || 'Dr. Shalini Gupta'}</strong> ({activeStaff?.role || 'Senior Hematopathologist'})
+            Signing Operator: <strong>{activeStaff?.name || 'Authenticated laboratory operator'}</strong> ({activeStaff?.role || 'Laboratory operator'})
           </div>
 
           <div style={{ display: 'flex', gap: '0.75rem' }}>
@@ -541,9 +685,9 @@ export default function ReportDetailView({
             ) : (
               <button
                 className="btn-clinical primary"
-                disabled={hasNeedsReview || isExtractionPending || isPublishing}
+                disabled={publishBlockers.length > 0 || isExtractionPending || isPublishing}
                 onClick={() => setIsPublishModalOpen(true)}
-                title={hasNeedsReview ? 'Resolve all flagged items before publication' : 'Publish report to VaaniDoc'}
+                title={publishBlockers.length > 0 ? 'Resolve all publication blockers before publishing' : 'Publish report to VaaniDoc'}
                 style={{ padding: '0.65rem 1.4rem' }}
               >
                 {isExtractionPending ? (
@@ -551,7 +695,7 @@ export default function ReportDetailView({
                     <Clock size={15} />
                     <span>Extraction Pending</span>
                   </>
-                ) : hasNeedsReview ? (
+                ) : publishBlockers.length > 0 ? (
                   <>
                     <Lock size={15} />
                     <span>Publishing Disabled (Resolve Flagged)</span>
@@ -592,6 +736,11 @@ export default function ReportDetailView({
               {editingObs.review_reason && (
                 <div style={{ fontSize: '0.78rem', color: '#b91c1c', marginTop: '0.25rem' }}>
                   {editingObs.review_reason}
+                </div>
+              )}
+              {editError && (
+                <div role="alert" style={{ marginTop: '0.65rem', padding: '0.6rem 0.7rem', borderRadius: 'var(--radius-md)', background: 'var(--status-review-bg)', border: '1px solid var(--status-review-border)', color: 'var(--status-review-text)', fontSize: '0.78rem' }}>
+                  {editError}
                 </div>
               )}
             </div>

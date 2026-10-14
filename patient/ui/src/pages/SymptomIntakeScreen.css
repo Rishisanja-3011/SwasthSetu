@@ -1,0 +1,17 @@
+.intake-heading p { margin: 0 auto; }
+.intake-mode-switch { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 6px; margin-bottom: 22px; background: var(--surface-inset); box-shadow: var(--neo-inset-sm); border-radius: 16px; }
+.intake-mode-switch button { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 13px 8px; border: 1px solid transparent; border-radius: 12px; background: transparent; color: var(--slate-600); font-weight: 700; cursor: pointer; }
+.intake-mode-switch button[aria-pressed="true"] { background: var(--surface-raised); box-shadow: var(--shadow-sm); color: var(--teal-700); border-color: white; }
+.intake-languages { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.intake-languages button { padding: 12px 8px; border: 1px solid var(--border-medium); border-radius: 12px; background: white; color: var(--slate-700); font-size: .8rem; cursor: pointer; }
+.intake-languages button[aria-pressed="true"] { border-color: var(--teal-600); background: var(--teal-50); color: var(--teal-800); box-shadow: var(--neo-inset-sm); font-weight: 700; }
+.intake-voice-card { text-align: center; padding: 36px 20px; margin: 22px 0; }
+.intake-voice-card.is-recording { border-color: var(--teal-500); }
+.intake-mic-button { width: 100px; height: 100px; border-radius: 50%; border: 5px solid white; background: var(--brand-gradient); color: white; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 20px; cursor: pointer; box-shadow: 0 0 0 10px var(--teal-50), var(--shadow-lg); }
+.is-recording .intake-mic-button { background: linear-gradient(135deg, #ef4444, #b91c1c); animation: pulseGlow 2s infinite; }
+.intake-mic-button:disabled { opacity: .55; }
+.intake-wave { height: 28px; display: flex; align-items: center; justify-content: center; gap: 4px; margin: 8px 0; }
+.intake-wave span { width: 4px; height: 8px; background: var(--teal-500); border-radius: 3px; animation: intakeWave .9s ease-in-out infinite; }
+.intake-recording-ready { margin-top: 14px; color: var(--teal-700); font-size: .8rem; font-weight: 700; }
+@keyframes intakeWave { 50% { height: 24px; } }
+@media (max-width: 580px) { .intake-languages { grid-template-columns: 1fr 1fr; } }

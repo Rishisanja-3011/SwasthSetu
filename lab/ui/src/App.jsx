@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import LabNavbar from './components/LabNavbar';
 import LabSidebar from './components/LabSidebar';
 import LabDashboardView from './components/LabDashboardView';
@@ -6,14 +6,6 @@ import PatientVisitView from './components/PatientVisitView';
 import ReportDetailView from './components/ReportDetailView';
 import LabProfileModal from './components/LabProfileModal';
 import LabLoginView from './components/LabLoginView';
-
-const DEFAULT_STAFF = {
-  id: 'staff-01',
-  name: 'Dr. Shalini Gupta',
-  role: 'Senior Hematopathologist',
-  qualification: 'MBBS, MD Pathology',
-  license: 'MED-PATH-9021',
-};
 
 function fileToBase64(file) {
   return new Promise((resolve, reject) => {
@@ -24,6 +16,26 @@ function fileToBase64(file) {
   });
 }
 
+function valueId(value) {
+  if (value && typeof value === 'object') return value._id || value.id || '';
+  return value || '';
+}
+
+function reportBelongsToGrant(report, grant) {
+  const grantId = valueId(grant?.grant_id || grant?._id);
+  const reportGrantId = valueId(report?.lab_access_grant_id);
+  const grantReportId = valueId(
+    grant?.report_id || grant?.published_report?._id || grant?.published_report,
+  );
+
+  return Boolean(
+    grantId
+      && reportGrantId
+      && String(reportGrantId) === String(grantId)
+      && (!grantReportId || String(report?._id) === String(grantReportId)),
+  );
+}
+
 export default function App() {
   // Navigation & Authentication State
   const [accessToken, setAccessToken] = useState(() => localStorage.getItem('vaanidoc_lab_access_token') || '');
@@ -32,7 +44,7 @@ export default function App() {
 
   // Lab & Dashboard Data
   const [lab, setLab] = useState(null);
-  const [activeStaff] = useState(DEFAULT_STAFF);
+  const [activeStaff, setActiveStaff] = useState(null);
   const [metrics, setMetrics] = useState({
     activeGrantsCount: 0,
     processingCount: 0,
@@ -51,10 +63,13 @@ export default function App() {
   // Processing & Publishing Flags
   const [isProcessing, setIsProcessing] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
+  const [isDashboardLoading, setIsDashboardLoading] = useState(false);
 
   // Modals & Banners
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [notification, setNotification] = useState(null);
+  const grantLoadRef = useRef(0);
+  const sessionRef = useRef(0);
 
   const apiFetch = (url, options = {}) => fetch(url, {
     ...options,
@@ -70,85 +85,159 @@ export default function App() {
     setTimeout(() => setNotification(null), 5000);
   };
 
-  // Load Initial Lab & Dashboard Data
-  const loadDashboard = async () => {
+  const labWorkflowMessage = (code, fallback) => {
+    const mappedMessage = {
+      REPORT_ALREADY_UPLOADED: 'This access grant already has a preserved report. Use Fix & Verify for flagged observations, or start a new grant for a replacement document.',
+      EXTRACTION_REVIEW_REQUIRED: 'Publication remains disabled until the extraction review blockers are resolved.',
+      PUBLICATION_BLOCKED: 'Publication remains disabled until all observations are validated.',
+      LAB_WORKFLOW_FAILED: fallback,
+    }[code];
+
+    return mappedMessage || code || fallback || 'Laboratory workflow failed.';
+  };
+
+  const loadAuthenticatedOperator = async () => {
     if (!accessToken) return;
+    const sessionId = sessionRef.current;
+
+    try {
+      const response = await apiFetch('/api/auth/me');
+      const data = await response.json();
+      if (sessionId !== sessionRef.current) return;
+      if (response.ok && data.success && data.user) {
+        setActiveStaff({
+          id: data.user.id,
+          name: data.user.name,
+          phone: data.user.phone,
+          role: data.user.role === 'LABORATORY' ? 'Laboratory operator' : data.user.role,
+        });
+      } else {
+        setActiveStaff(null);
+      }
+    } catch (err) {
+      console.error('Failed to load authenticated operator:', err);
+      setActiveStaff(null);
+    }
+  };
+
+  // Load Initial Lab & Dashboard Data. Refreshes never replace the visit the
+  // operator is currently reviewing.
+  const loadDashboard = async ({ selectFirst = false } = {}) => {
+    if (!accessToken) return;
+    const sessionId = sessionRef.current;
+    setIsDashboardLoading(true);
     try {
       const listRes = await apiFetch('/api/lab/list');
       const listData = await listRes.json();
-      if (listData.success && listData.laboratories.length > 0) {
+      if (sessionId !== sessionRef.current) return;
+      if (!listRes.ok || !listData.success) {
+        throw new Error(listData.error || 'Laboratory list could not be loaded.');
+      }
+
+      if (listData.laboratories.length > 0) {
         const activeLab = listData.laboratories[0];
         setLab(activeLab);
 
-      const dashRes = await apiFetch(`/api/lab/dashboard/${activeLab._id}`);
+        const dashRes = await apiFetch(`/api/lab/dashboard/${activeLab._id}`);
         const dashData = await dashRes.json();
-        if (dashData.success) {
-          setMetrics(dashData.metrics);
-          setWorklist(dashData.worklist || []);
-          setAllReportsList(dashData.reports || []);
+        if (sessionId !== sessionRef.current) return;
+        if (!dashRes.ok || !dashData.success) {
+          throw new Error(dashData.error || 'Laboratory dashboard could not be loaded.');
+        }
 
-          // If no active grant is selected, pick the first active one
-          if (!selectedGrant && dashData.worklist?.length > 0) {
-            const firstActive = dashData.worklist.find((g) => g.grant_status === 'ACTIVE') || dashData.worklist[0];
-            setSelectedGrant(firstActive);
-            loadGrantDetails(firstActive, dashData.reports || []);
-          }
+        setMetrics(dashData.metrics);
+        setWorklist(dashData.worklist || []);
+        setAllReportsList(dashData.reports || []);
+
+        const refreshedSelectedGrant = selectedGrant
+          && (dashData.worklist || []).find((grant) => String(valueId(grant.grant_id || grant._id))
+            === String(valueId(selectedGrant.grant_id || selectedGrant._id)));
+        const selectedReportId = valueId(
+          selectedGrant?.report_id || selectedGrant?.published_report?._id || selectedGrant?.published_report,
+        );
+        const refreshedReportId = valueId(
+          refreshedSelectedGrant?.report_id
+            || refreshedSelectedGrant?.published_report?._id
+            || refreshedSelectedGrant?.published_report,
+        );
+        if (refreshedSelectedGrant && (
+          refreshedSelectedGrant.grant_status !== selectedGrant.grant_status
+          || String(selectedReportId) !== String(refreshedReportId)
+        )) {
+          setSelectedGrant(refreshedSelectedGrant);
+          loadGrantDetails(refreshedSelectedGrant, dashData.reports || []);
+        }
+
+        // Select one visit on the first authenticated load only. A manual
+        // refresh is deliberately non-destructive so newly approved grants
+        // appear without changing the current patient context.
+        if (selectFirst && !selectedGrant && dashData.worklist?.length > 0) {
+          const firstActive = dashData.worklist.find((g) => g.grant_status === 'ACTIVE') || dashData.worklist[0];
+          setSelectedGrant(firstActive);
+          loadGrantDetails(firstActive, dashData.reports || []);
         }
       }
     } catch (err) {
       console.error('Failed to load dashboard:', err);
+      showNotification(err.message || 'Failed to load laboratory dashboard.', 'warning');
+    } finally {
+      if (sessionId === sessionRef.current) setIsDashboardLoading(false);
     }
   };
 
   // Load details for a selected grant (identity + existing report if present)
   const loadGrantDetails = async (grant, reportsList = allReportsList) => {
     if (!grant) return;
+    const requestId = grantLoadRef.current + 1;
+    grantLoadRef.current = requestId;
     const grantId = grant.grant_id || grant._id;
+
+    // Do not allow identity, report, or observations from a previous grant to
+    // survive while this grant is being loaded.
+    setIdentityData(null);
+    setCurrentReport(null);
+    setObservations([]);
+
+    const reportId = grant.report_id || grant.published_report?._id || grant.published_report;
+    const matchedReport = (reportsList || []).find((report) => reportBelongsToGrant(report, grant)
+      && (!reportId || String(report._id) === String(valueId(reportId))));
 
     // 1. Fetch patient identity if grant is active
     if (grant.grant_status === 'ACTIVE') {
       try {
         const res = await apiFetch(`/api/lab/grant/${grantId}/patient-identity`);
         const data = await res.json();
-        if (data.success) {
+        if (requestId !== grantLoadRef.current) return;
+        if (res.ok && data.success) {
           setIdentityData(data);
         } else {
           setIdentityData(null);
         }
       } catch (err) {
         console.error('Error fetching identity:', err);
+        if (requestId === grantLoadRef.current) setIdentityData(null);
       }
-    } else {
-      setIdentityData(null);
     }
 
-    // 2. Check if a report already exists for this grant / patient
+    // 2. Select reports by their explicit grant linkage. Patient names are
+    // intentionally never used as a report matching key.
+    if (requestId !== grantLoadRef.current) return;
+    if (!matchedReport) return;
+
+    // Published reports cannot be fetched through the active-report endpoint.
+    // The dashboard summary is the safe receipt that remains visible.
+    if (grant.grant_status !== 'ACTIVE' || matchedReport.status === 'PUBLISHED') {
+      setCurrentReport(matchedReport);
+      return;
+    }
+
     try {
-      const reportId = grant.published_report?._id || grant.published_report;
-      let matchedReport = null;
-
-      if (reportId) {
-        matchedReport = reportsList.find((r) => r._id === reportId);
-      } else if (grant.report_id) {
-        matchedReport = reportsList.find((r) => String(r._id) === String(grant.report_id));
-      } else if (grant.patient?.name) {
-        matchedReport = reportsList.find((r) => r.patient_id?.name === grant.patient?.name || r.patient_id === grant.patient?.id);
-      }
-
-      if (matchedReport) {
-        const repRes = await apiFetch(`/api/lab/report/${matchedReport._id}`);
-        const repData = await repRes.json();
-        if (repData.success) {
-          setCurrentReport(repData.report);
-          setObservations(repData.observations || []);
-          return;
-        }
-      }
-
-      // If no report found yet for this active visit
-      if (grant.grant_status === 'ACTIVE') {
-        setCurrentReport(null);
-        setObservations([]);
+      const repRes = await apiFetch(`/api/lab/report/${matchedReport._id}`);
+      const repData = await repRes.json();
+      if (requestId !== grantLoadRef.current) return;
+      if (repRes.ok && repData.success && reportBelongsToGrant(repData.report, grant)) {
+        setCurrentReport(repData.report);
+        setObservations(repData.observations || []);
       }
     } catch (err) {
       console.error('Error loading report for grant:', err);
@@ -156,7 +245,9 @@ export default function App() {
   };
 
   useEffect(() => {
-    loadDashboard();
+    if (!accessToken) return;
+    loadAuthenticatedOperator();
+    loadDashboard({ selectFirst: true });
   }, [accessToken]);
 
   const handleLabLogin = async ({ labCode, phone }) => {
@@ -208,20 +299,24 @@ export default function App() {
   // Action: Open a visit from the Dashboard Worklist
   const handleOpenPatientVisit = async (grant) => {
     setSelectedGrant(grant);
-    await loadGrantDetails(grant);
     setCurrentView('patient_visit');
+    await loadGrantDetails(grant);
   };
 
   // Action: Open a report from the Dashboard Worklist
   const handleOpenReport = async (grant) => {
     setSelectedGrant(grant);
-    await loadGrantDetails(grant);
     setCurrentView('reports');
+    await loadGrantDetails(grant);
   };
 
   // Action: Upload Generated Blood Report & Run CBC Extraction Engine
   const handleUploadReport = async ({ fileName, rawText = null, rawFile = null }) => {
-    if (!selectedGrant) return;
+    if (!selectedGrant || selectedGrant.grant_status !== 'ACTIVE') {
+      const error = 'This laboratory access grant has expired. Upload is no longer available.';
+      showNotification(error, 'warning');
+      return { success: false, error };
+    }
     setIsProcessing(true);
 
     try {
@@ -231,16 +326,16 @@ export default function App() {
         method: 'POST',
         body: JSON.stringify({
           grant_id: grantId,
-          file_name: fileName || 'CBC_Report_Rahul_Sharma.pdf',
+          file_name: fileName || 'laboratory-report.pdf',
           raw_text: rawText || '',
           file_base64: fileBase64,
           file_mime_type: rawFile?.type || 'application/pdf',
-          technician: activeStaff,
+          ...(activeStaff ? { technician: activeStaff } : {}),
         }),
       });
 
       const data = await res.json();
-      if (data.success) {
+      if (res.ok && data.success && reportBelongsToGrant(data.report, selectedGrant)) {
         setCurrentReport(data.report);
         setObservations(data.observations || []);
 
@@ -255,11 +350,19 @@ export default function App() {
         await loadDashboard();
         // Immediately navigate to extraction review in Reports view
         setCurrentView('reports');
+        return { success: true };
       } else {
-        showNotification(data.error || 'Failed to process uploaded report.', 'warning');
+        const error = labWorkflowMessage(
+          data.error,
+          'The uploaded report response did not match the selected access grant.',
+        );
+        showNotification(error, 'warning');
+        return { success: false, error };
       }
     } catch (err) {
-      showNotification('Error connecting to extraction engine.', 'warning');
+      const error = labWorkflowMessage(err.message, 'Error connecting to extraction engine.');
+      showNotification(error, 'warning');
+      return { success: false, error };
     } finally {
       setIsProcessing(false);
     }
@@ -272,52 +375,75 @@ export default function App() {
         method: 'PUT',
         body: JSON.stringify({
           ...updatedFields,
-          technician: activeStaff,
+          ...(activeStaff ? { technician: activeStaff } : {}),
         }),
       });
 
       const data = await res.json();
-      if (data.success) {
+      if (res.ok && data.success) {
         setObservations((prev) =>
           prev.map((o) => (o._id === obsId ? data.observation : o))
         );
 
-        if (currentReport) {
+        if (data.report && reportBelongsToGrant(data.report, selectedGrant)) {
+          setCurrentReport(data.report);
+        } else if (currentReport) {
           setCurrentReport((prev) => ({
             ...prev,
             status: data.report_status,
+            extraction_review_required: data.extraction_review_required,
+            publish_blocking_reasons: data.publish_blocking_reasons || [],
           }));
         }
 
         showNotification('Observation corrected and deterministically verified!', 'teal');
         await loadDashboard();
+        return { success: true };
       } else {
-        showNotification(data.error || 'Failed to update observation.', 'warning');
+        const error = labWorkflowMessage(data.error, 'Failed to update observation.');
+        showNotification(error, 'warning');
+        return { success: false, error };
       }
     } catch (err) {
-      showNotification('Error updating observation.', 'warning');
+      const error = labWorkflowMessage(err.message, 'Error updating observation.');
+      showNotification(error, 'warning');
+      return { success: false, error };
     }
   };
 
   // Action: Publish CBC Report to VaaniDoc (Screen #6 -> Screen #7)
   const handlePublishReport = async (signOffNotes) => {
-    if (!currentReport) return;
+    if (!currentReport || !selectedGrant || selectedGrant.grant_status !== 'ACTIVE') {
+      const error = 'Publication is blocked because laboratory access has expired or no report is selected.';
+      showNotification(error, 'warning');
+      return { success: false, error };
+    }
     setIsPublishing(true);
 
     try {
       const grantId = selectedGrant?.grant_id || selectedGrant?._id;
+      if (!reportBelongsToGrant(currentReport, selectedGrant)) {
+        const error = 'Publication is blocked because the report is not linked to the selected access grant.';
+        showNotification(error, 'warning');
+        return { success: false, error };
+      }
       const res = await apiFetch(`/api/lab/report/${currentReport._id}/publish`, {
         method: 'POST',
         body: JSON.stringify({
           grant_id: grantId,
-          technician: activeStaff,
+          ...(activeStaff ? { technician: activeStaff } : {}),
           sign_off_notes: signOffNotes,
         }),
       });
 
       const data = await res.json();
-      if (data.success) {
+      if (res.ok && data.success && data.report) {
+        // Keep only the server's published summary as a receipt. Patient
+        // identity and observations are no longer in the laboratory context.
+        grantLoadRef.current += 1;
         setCurrentReport(data.report);
+        setObservations([]);
+        setIdentityData(null);
         if (selectedGrant) {
           setSelectedGrant((prev) => ({
             ...prev,
@@ -325,24 +451,52 @@ export default function App() {
             patient: null,
             diagnostic_order: null,
           }));
-          setIdentityData(null);
         }
         showNotification('Report published successfully! Bounded access expired automatically.', 'teal');
         await loadDashboard();
+        return { success: true };
       } else {
-        showNotification(data.error || 'Publication blocked.', 'warning');
+        const error = labWorkflowMessage(data.error, 'Publication blocked.');
+        showNotification(error, 'warning');
+        return { success: false, error };
       }
     } catch (err) {
-      showNotification('Error publishing report.', 'warning');
+      const error = labWorkflowMessage(err.message, 'Error publishing report.');
+      showNotification(error, 'warning');
+      return { success: false, error };
     } finally {
       setIsPublishing(false);
     }
+  };
+
+  const handleLogout = () => {
+    sessionRef.current += 1;
+    grantLoadRef.current += 1;
+    localStorage.removeItem('vaanidoc_lab_access_token');
+    setAccessToken('');
+    setIsLoggedIn(false);
+    setActiveStaff(null);
+    setLab(null);
+    setSelectedGrant(null);
+    setIdentityData(null);
+    setCurrentReport(null);
+    setObservations([]);
+    setWorklist([]);
+    setAllReportsList([]);
+    setIsDashboardLoading(false);
+    setCurrentView('dashboard');
   };
 
   // Derive Current Access Status:
   // ACTIVE if the selected grant is ACTIVE and its report is not published
   const isAccessActive = selectedGrant?.grant_status === 'ACTIVE' && currentReport?.status !== 'PUBLISHED';
   const accessStatus = isAccessActive ? 'ACTIVE' : 'EXPIRED';
+  const existingReportId = valueId(
+    selectedGrant?.report_id
+      || selectedGrant?.published_report?._id
+      || selectedGrant?.published_report
+      || (reportBelongsToGrant(currentReport, selectedGrant) ? currentReport?._id : ''),
+  );
 
   // If user is logged out, render Screen #1: Lab Login
   if (!isLoggedIn) {
@@ -369,11 +523,7 @@ export default function App() {
           currentView={currentView}
           onNavigate={(view) => setCurrentView(view)}
           onOpenProfile={() => setIsProfileModalOpen(true)}
-           onLogout={() => {
-             localStorage.removeItem('vaanidoc_lab_access_token');
-             setAccessToken('');
-             setIsLoggedIn(false);
-           }}
+           onLogout={handleLogout}
           counts={{
             pendingVisits: metrics?.activeGrantsCount || 0,
             needsReview: metrics?.needsReviewCount || 0,
@@ -396,28 +546,44 @@ export default function App() {
               worklist={worklist}
               onOpenPatientVisit={handleOpenPatientVisit}
               onOpenReport={handleOpenReport}
+              onRefresh={() => loadDashboard()}
+              isRefreshing={isDashboardLoading}
             />
           )}
 
           {/* VIEW 2: PATIENT VISIT / VERIFICATION (Screen #3) */}
           {currentView === 'patient_visit' && (
             <PatientVisitView
-              identityData={identityData}
-              onUploadReport={handleUploadReport}
-              isProcessing={isProcessing}
-              onBackToDashboard={() => setCurrentView('dashboard')}
-            />
+               key={selectedGrant?.grant_id || selectedGrant?._id || 'no-grant'}
+               identityData={identityData}
+               onUploadReport={handleUploadReport}
+               isProcessing={isProcessing}
+               onBackToDashboard={() => setCurrentView('dashboard')}
+               onOpenReport={() => handleOpenReport(selectedGrant)}
+               existingReportId={existingReportId}
+               grantKey={selectedGrant?.grant_id || selectedGrant?._id || 'no-grant'}
+             />
           )}
 
           {/* VIEW 3: REPORTS (Screen #4, #5, #6, #7) */}
           {currentView === 'reports' && (
             <ReportDetailView
-              report={currentReport}
+               key={selectedGrant?.grant_id || selectedGrant?._id || 'no-grant'}
+               report={currentReport}
               observations={observations}
-               patient={selectedGrant?.patient || identityData?.identity || {}}
-              order={selectedGrant?.diagnostic_order || identityData?.order}
-              grantStatus={accessStatus}
-              isProcessing={isProcessing}
+               patient={selectedGrant?.grant_status === 'ACTIVE'
+                 ? (identityData?.identity || selectedGrant?.patient || null)
+                 : null}
+              identity={selectedGrant?.grant_status === 'ACTIVE'
+                ? (identityData?.identity || selectedGrant?.patient || null)
+                : null}
+               order={selectedGrant?.grant_status === 'ACTIVE'
+                 ? (selectedGrant?.diagnostic_order || identityData?.order)
+                 : null}
+               grantStatus={accessStatus}
+               grantKey={selectedGrant?.grant_id || selectedGrant?._id || 'no-grant'}
+               existingReportId={existingReportId}
+               isProcessing={isProcessing}
               isPublishing={isPublishing}
               onUploadReport={handleUploadReport}
               onUpdateObservation={handleUpdateObservation}

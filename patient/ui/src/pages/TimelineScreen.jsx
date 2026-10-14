@@ -71,8 +71,8 @@ export function TimelineScreen() {
   }, [patient?.id, reload]);
 
   return <div className="consultation-timeline page-reading-container">
-    <header className="consultation-page-header">
-      <div><span className="consultation-eyebrow">YOUR HEALTH RECORD</span><h1>My consultations</h1><p>Each visit, in one place. Open a consultation to see your intake and ordered tests.</p></div>
+    <header className="consultation-page-header page-heading">
+      <div><span className="page-eyebrow">YOUR HEALTH JOURNEY</span><h1>My consultations</h1><p>Each visit, in one place. Open a consultation to see your intake and ordered tests.</p></div>
       <button className="btn btn-secondary" onClick={() => setReload((v) => v + 1)} disabled={loading} aria-label="Refresh consultations"><RefreshCw size={17} /></button>
     </header>
     {loading ? <div className="consultation-empty" role="status">Loading your consultations…</div> : error ? <div className="consultation-empty" role="alert"><p>{error}</p><button className="btn btn-primary" onClick={() => setReload((v) => v + 1)}>Try again</button></div> : consultations.length === 0 ? <div className="consultation-empty"><CalendarDays size={34} /><h2>Your first visit starts here</h2><p>Your consultations will appear here after you start a doctor visit.</p><Link to="/" className="btn btn-primary">Start a doctor visit</Link></div> : <>

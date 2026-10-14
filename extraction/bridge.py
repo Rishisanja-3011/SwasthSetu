@@ -51,7 +51,9 @@ def main() -> int:
         "publish_blocking_reasons": result.publish_blocking_reasons,
         "template_explanation": result.template_explanation,
     }
-    print(json.dumps(_json_safe(payload), ensure_ascii=False, allow_nan=False))
+    # Keep stdout ASCII-safe across Windows code pages; the Node bridge treats
+    # stdout as UTF-8 while the Python console may otherwise emit CP-1252.
+    print(json.dumps(_json_safe(payload), ensure_ascii=True, allow_nan=False))
     return 0
 
 

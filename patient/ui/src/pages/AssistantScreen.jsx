@@ -3,6 +3,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { FaPaperPlane } from 'react-icons/fa';
+import { Bot, FileText, Activity, Heart, Utensils } from 'lucide-react';
 
 import { usePatient } from '../context/PatientContext';
 import { sendMessageToMediBot } from '../services/mediBotApi';
@@ -182,6 +183,7 @@ export function AssistantScreen() {
   const [loading, setLoading] = useState(false);
 
   const messagesEndRef = useRef(null);
+  const questionRef = useRef(null);
 
   useEffect(() => {
     setMessages(loadSavedMessages(storageKey));
@@ -318,7 +320,7 @@ export function AssistantScreen() {
 
   /* Enter sends the message. */
   const handleKeyDown = (event) => {
-    if (event.key === 'Enter' && !event.shiftKey) {
+    if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
       event.preventDefault();
       handleSend();
     }
@@ -343,13 +345,13 @@ export function AssistantScreen() {
       {/* Header */}
       <header className="medibot-header">
         <div className="medibot-header-info">
-          <div className="medibot-bot-icon">🩺</div>
+          <div className="medibot-bot-icon"><Bot size={26} /></div>
 
           <div>
             <h1>MediBot</h1>
             <div className="medibot-status">
               <span className="medibot-status-dot"></span>
-              Online
+              Your health education assistant
             </div>
           </div>
         </div>
@@ -368,7 +370,7 @@ export function AssistantScreen() {
       <div className="medibot-chat-window">
         {messages.length === 0 ? (
           <div className="medibot-empty-chat">
-            <div className="medibot-empty-icon">🩺</div>
+            <div className="medibot-empty-icon"><Bot size={36} /></div>
 
             <h2>Welcome to MediBot 👋</h2>
 
@@ -384,18 +386,16 @@ export function AssistantScreen() {
               </p>
 
               <div className="medibot-suggestion-list">
-                <div className="medibot-suggestion-item">
-                  🩸 <span>Blood tests &amp; reports</span>
-                </div>
-                <div className="medibot-suggestion-item">
-                  💉 <span>Hemoglobin, CBC &amp; blood parameters</span>
-                </div>
-                <div className="medibot-suggestion-item">
-                  🥗 <span>Nutrition &amp; vitamin deficiencies</span>
-                </div>
-                <div className="medibot-suggestion-item">
-                  ❤️ <span>General health &amp; medical education</span>
-                </div>
+                {[
+                  [FileText, 'Blood tests & reports', 'What does a CBC blood test measure?'],
+                  [Activity, 'Understanding hemoglobin', 'What is hemoglobin and what does it do?'],
+                  [Utensils, 'Nutrition & vitamins', 'Which foods are sources of iron?'],
+                  [Heart, 'Everyday health', 'What are some general healthy habits?'],
+                ].map(([Icon, label, prompt]) => (
+                  <button key={label} type="button" className="medibot-suggestion-item" onClick={() => { setQuestion(prompt); questionRef.current?.focus(); }}>
+                    <Icon size={20} /> <span>{label}</span>
+                  </button>
+                ))}
               </div>
             </div>
 
@@ -406,7 +406,7 @@ export function AssistantScreen() {
             </p>
           </div>
         ) : (
-          <div className="medibot-messages">
+          <div className="medibot-messages" role="log" aria-label="Conversation with MediBot" aria-live="polite">
             {/* Hide the static thinking message; keep the animated one below. */}
             {messages
               .filter((message) => message.role !== 'thinking')
@@ -459,7 +459,10 @@ export function AssistantScreen() {
       <div className="medibot-input-container">
         <div className="medibot-input-wrapper">
           <input
+            ref={questionRef}
             type="text"
+            aria-label="Your question for MediBot"
+            maxLength={MAX_QUESTION_LENGTH}
             placeholder="Ask MediBot anything..."
             value={question}
             onChange={(event) => setQuestion(event.target.value)}
@@ -472,6 +475,7 @@ export function AssistantScreen() {
             onClick={handleSend}
             disabled={loading || !question.trim()}
             title="Send message"
+            aria-label="Send message"
           >
             {loading ? '...' : <FaPaperPlane />}
           </button>

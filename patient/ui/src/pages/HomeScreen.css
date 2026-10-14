@@ -1,0 +1,18 @@
+.home-welcome { position: relative; overflow: hidden; padding: 28px 30px; border-color: var(--teal-300); }
+.home-welcome::after { content: ''; position: absolute; width: 210px; height: 210px; right: -90px; bottom: -110px; border: 28px solid rgba(34, 146, 160, .07); border-radius: 50%; pointer-events: none; }
+.home-welcome h1 { font-size: clamp(1.55rem, 3vw, 2rem); font-weight: 800; }
+.home-welcome-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 22px; }
+.home-patient-id, .home-ownership { display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; border-radius: 999px; font-size: .72rem; font-weight: 700; }
+.home-patient-id { background: white; border: 1px solid var(--teal-200); color: var(--teal-700); font-family: var(--font-mono); overflow-wrap: anywhere; }
+.home-ownership { background: var(--teal-50); color: var(--teal-700); }
+.home-resume { margin-top: 16px; font-size: .82rem; }
+.home-scan-card { position: relative; }
+.home-code-form { display: flex; gap: 8px; }
+.home-code-form input { width: 100%; min-width: 0; }
+@media (max-width: 520px) {
+  .home-welcome { padding: 22px 18px; }
+  .home-welcome-meta { gap: 6px; margin-bottom: 18px; }
+  .home-code-form { flex-wrap: wrap; }
+  .home-code-form input { flex-basis: 100% !important; }
+  .home-code-form button { width: 100%; }
+}

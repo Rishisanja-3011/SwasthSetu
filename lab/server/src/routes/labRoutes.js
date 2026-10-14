@@ -119,6 +119,16 @@ function extractionReportStatus(extraction) {
   return hasReview ? 'NEEDS_REVIEW' : 'PROCESSING';
 }
 
+function reportReviewBlockers(report, observations = []) {
+  const blockers = [];
+  const validationStatus = report.extraction_validation?.status;
+  const coverageStatus = report.extraction_coverage?.status;
+  if (validationStatus && validationStatus !== 'VALID') blockers.push(`EXTRACTION_VALIDATION_${validationStatus}`);
+  if (coverageStatus && coverageStatus !== 'COMPLETE') blockers.push(`EXTRACTION_COVERAGE_${coverageStatus}`);
+  if (observations.some((item) => item.validation_status === 'NEEDS_REVIEW')) blockers.push('OBSERVATION_REVIEW_REQUIRED');
+  return blockers;
+}
+
 function audit(req, report, action, details = {}) {
   return {
     actor_type: 'LABORATORY', actor_id: String(req.laboratory._id),
@@ -239,6 +249,7 @@ router.post(['/upload-report', '/generate-report'], enforceActiveLabGrant, handl
       : []),
   ];
   let report;
+  let persistedObservations = [];
   try {
     await mongoose.connection.transaction(async (session) => {
       // Writing the grant serializes upload/publication attempts for this visit.
@@ -261,20 +272,20 @@ router.post(['/upload-report', '/generate-report'], enforceActiveLabGrant, handl
          extraction_review_required: Boolean(extraction.review_required) || reportStatus === 'NEEDS_REVIEW',
          extraction_completed_at: new Date(),
        }], { session });
-       await ReportFile.create([metadata], { session });
-       if (observations.length) {
-         await LabObservation.create(observations.map((observation) => ({
-           ...observation,
-           report_id: report._id,
-         })), { session });
-       }
-       await AuditEvent.create([audit(req, report, 'LAB_REPORT_UPLOADED')], { session });
+        await ReportFile.create([metadata], { session });
+        if (observations.length) {
+          persistedObservations = await LabObservation.create(observations.map((observation) => ({
+            ...observation,
+            report_id: report._id,
+          })), { session, ordered: true });
+        }
+        await AuditEvent.create([audit(req, report, 'LAB_REPORT_UPLOADED')], { session, ordered: true });
        await AuditEvent.create([audit(req, report, 'LAB_REPORT_EXTRACTED', {
          input_type: extraction.source?.input_type,
          tests_detected: extraction.validation?.tests_detected || extractedTests.length,
          observations_created: observations.length,
          report_status: reportStatus,
-       })], { session });
+        })], { session, ordered: true });
     });
   } catch (error) {
     await removeOriginalPdf(metadata);
@@ -284,7 +295,7 @@ router.post(['/upload-report', '/generate-report'], enforceActiveLabGrant, handl
   res.status(201).json({
     success: true,
     report: reportSummary(report, true),
-    observations,
+    observations: persistedObservations,
     extraction_pending: false,
     needs_review: reportStatus === 'NEEDS_REVIEW',
     extraction: {
@@ -324,6 +335,7 @@ router.put('/observation/:observationId', handle(async (req, res) => {
   let observation;
   let reportStatus;
   let unresolvedCount;
+  let updatedReport;
   await mongoose.connection.transaction(async (session) => {
     const { report } = await activeReport(req, found.report_id, session);
     if (!['PROCESSING', 'NEEDS_REVIEW'].includes(report.status)) fail(409, 'EXTRACTION_PENDING');
@@ -349,15 +361,31 @@ router.put('/observation/:observationId', handle(async (req, res) => {
     observation.review_reason = null;
     await observation.save({ session });
     unresolvedCount = await LabObservation.countDocuments({ report_id: report._id, validation_status: { $ne: 'OK' } }).session(session);
-    report.status = unresolvedCount ? 'NEEDS_REVIEW' : 'PROCESSING';
+    const remainingObservations = await LabObservation.find({
+      report_id: report._id,
+      validation_status: 'NEEDS_REVIEW',
+    }).session(session);
+    const remainingBlockers = reportReviewBlockers(report, remainingObservations);
+    report.status = remainingBlockers.length ? 'NEEDS_REVIEW' : 'PROCESSING';
+    report.extraction_review_required = remainingBlockers.length > 0;
+    report.publish_blocking_reasons = remainingBlockers;
     report.workflow_revision += 1;
     await report.save({ session });
     reportStatus = report.status;
+    updatedReport = report;
     await AuditEvent.create([audit(req, report, 'LAB_OBSERVATION_MANUAL_CORRECTION', {
       observation_id: String(observation._id), edit_reason: reason,
-    })], { session });
+    })], { session, ordered: true });
   });
-  res.json({ success: true, observation, report_status: reportStatus, unresolved_count: unresolvedCount });
+  res.json({
+    success: true,
+    observation,
+    report: reportSummary(updatedReport, true),
+    report_status: reportStatus,
+    unresolved_count: unresolvedCount,
+    extraction_review_required: updatedReport.extraction_review_required,
+    publish_blocking_reasons: updatedReport.publish_blocking_reasons || [],
+  });
 }));
 
 router.post('/report/:reportId/publish', handle(async (req, res) => {
@@ -366,6 +394,11 @@ router.post('/report/:reportId/publish', handle(async (req, res) => {
     const { report, grant } = await activeReport(req, req.params.reportId, session);
     if (req.body.grant_id && String(req.body.grant_id) !== String(grant._id)) fail(403, 'REPORT_GRANT_MISMATCH');
     if (!['PROCESSING', 'NEEDS_REVIEW'].includes(report.status)) fail(409, 'EXTRACTION_PENDING');
+    if (report.extraction_review_required || report.publish_blocking_reasons?.length
+      || report.extraction_validation?.status !== 'VALID'
+      || report.extraction_coverage?.status !== 'COMPLETE') {
+      fail(409, 'EXTRACTION_REVIEW_REQUIRED');
+    }
     const observations = await LabObservation.find({ report_id: report._id }).session(session);
     if (!observations.length || observations.some((item) => item.validation_status !== 'OK' || !Number.isFinite(item.value))) fail(409, 'PUBLICATION_BLOCKED');
     const file = await ReportFile.findOne({ report_id: report._id }).session(session);
@@ -384,7 +417,7 @@ router.post('/report/:reportId/publish', handle(async (req, res) => {
     await AuditEvent.create([
       audit(req, report, 'PUBLISH_CBC_REPORT', { sign_off_notes: typeof req.body.sign_off_notes === 'string' ? req.body.sign_off_notes.trim() : '' }),
       { actor_type: 'SYSTEM', actor_id: 'BOUNDED_ACCESS_GUARD', action: 'EXPIRE_LAB_ACCESS_GRANT', resource_type: 'LabAccessGrant', resource_id: String(grant._id), patient_id: report.patient_id, outcome: 'EXPIRED', details: { published_report_id: String(report._id) } },
-    ], { session });
+    ], { session, ordered: true });
     published = reportSummary(report);
   });
   res.json({ success: true, report: published, grant_status: 'EXPIRED', access_expired: true });

@@ -5,7 +5,7 @@ import './BottomNav.css';
 
 export function BottomNav() {
   return (
-    <nav className="patient-bottom-nav">
+    <nav className="patient-bottom-nav" aria-label="Patient navigation">
       <NavLink
         to="/"
         className={({ isActive }) => `nav-tab-item ${isActive ? 'active' : ''}`}

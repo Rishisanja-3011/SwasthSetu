@@ -7,6 +7,9 @@
     "start": "node src/server.js",
     "dev": "node src/server.js",
     "init-db": "node scripts/initDatabase.js",
+    "demo:seed": "node scripts/seedDemoData.js",
+    "demo:smoke": "node scripts/smokeDemoWorkflow.js",
+    "demo:reset": "node scripts/seedDemoData.js --confirm-demo --reset",
     "test": "node --test"
   },
   "keywords": [],

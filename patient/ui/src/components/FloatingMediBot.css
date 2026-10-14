@@ -1,11 +1,11 @@
 
 .floating-medibot {
-  --medibot-teal: #009b7d;
-  --medibot-navy: #0a2540;
+  --medibot-teal: var(--teal-600);
+  --medibot-navy: var(--navy-900);
   position: fixed;
   right: 24px;
   bottom: 24px;
-  z-index: 1000;
+  z-index: 90;
   font-family: inherit;
 }
 
@@ -20,7 +20,7 @@
   padding: 0;
   border: 3px solid #ffffff;
   border-radius: 22px;
-  background: linear-gradient(145deg, #00b894, #008c72);
+  background: var(--brand-gradient);
   color: #ffffff;
   box-shadow: 0 8px 28px rgba(0, 117, 94, 0.3);
   cursor: pointer;
@@ -280,6 +280,7 @@
 
 .floating-medibot-message p {
   margin: 0 0 8px;
+  color: inherit;
 }
 
 .floating-medibot-message p:last-child {
@@ -302,7 +303,7 @@
 
 .floating-medibot-message.user {
   margin-left: auto;
-  background: #009b7d;
+  background: var(--brand-gradient);
   color: #ffffff;
   border-bottom-right-radius: 4px;
 }
@@ -426,11 +427,17 @@
   line-height: 1.5;
 }
 
+/* Keep the launcher and chat clear of the patient bottom navigation. */
+@media (max-width: 767px) {
+  .floating-medibot { bottom: calc(88px + env(safe-area-inset-bottom)); }
+  .floating-medibot-panel { height: min(550px, calc(100dvh - 240px)); }
+}
+
 /* Mobile layout */
 @media (max-width: 480px) {
   .floating-medibot {
     right: 14px;
-    bottom: 14px;
+    bottom: calc(88px + env(safe-area-inset-bottom));
   }
 
   .floating-medibot-launcher {
@@ -442,11 +449,11 @@
   .floating-medibot-panel {
     position: fixed;
     right: 10px;
-    bottom: 80px;
+    bottom: calc(156px + env(safe-area-inset-bottom));
     left: 10px;
     width: auto;
-    height: min(560px, calc(100dvh - 105px));
-    max-height: calc(100dvh - 105px);
+    height: min(560px, calc(100dvh - 230px - env(safe-area-inset-bottom)));
+    max-height: calc(100dvh - 230px - env(safe-area-inset-bottom));
     border-radius: 16px;
   }
 }

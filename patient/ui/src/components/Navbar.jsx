@@ -68,7 +68,9 @@ export function Navbar() {
             <button
               className="patient-badge-btn"
               onClick={() => setShowSwitcher(true)}
-              title="Switch Patient or View Demographics"
+              title="View your patient profile"
+              aria-label="View your patient profile"
+              aria-haspopup="dialog"
             >
               <div className="patient-avatar">
                 {patient?.name ? patient.name.charAt(0) : 'P'}

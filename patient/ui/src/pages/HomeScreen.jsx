@@ -19,10 +19,11 @@ import { patientApi } from '../services/patientApi';
 import { QRScannerModal } from '../components/QRScannerModal';
 import { LabPermissionModal } from '../components/LabPermissionModal';
 import { StatusBadge } from '../components/StatusBadge';
+import './HomeScreen.css';
 
 export function HomeScreen() {
   const navigate = useNavigate();
-  const { patient } = usePatient();
+  const { patient, activeEncounter } = usePatient();
 
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [selectedLabEntity, setSelectedLabEntity] = useState(null);
@@ -31,6 +32,8 @@ export function HomeScreen() {
   const [labGrants, setLabGrants] = useState([]);
   const [loading, setLoading] = useState(true);
   const [manualError, setManualError] = useState(null);
+  const [loadError, setLoadError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     loadHomeData();
@@ -38,6 +41,7 @@ export function HomeScreen() {
 
   const loadHomeData = async () => {
     setLoading(true);
+    setLoadError('');
     try {
       const [reps, grants] = await Promise.all([
         patientApi.getPublishedReports(),
@@ -46,7 +50,7 @@ export function HomeScreen() {
       setReports(reps.slice(0, 3));
       setLabGrants(grants);
     } catch (err) {
-      console.warn('Error loading dashboard data:', err);
+      setLoadError(err.message || 'Your records could not be loaded. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -62,13 +66,16 @@ export function HomeScreen() {
 
   const handleManualSubmit = async (e) => {
     e.preventDefault();
-    if (!manualCode.trim()) return;
+    if (!manualCode.trim() || isSubmitting) return;
     setManualError(null);
+    setIsSubmitting(true);
     try {
       const resolved = await patientApi.resolveCode(manualCode.trim());
       handleCodeResolved(resolved);
     } catch (err) {
       setManualError(err.message);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -88,50 +95,23 @@ export function HomeScreen() {
   return (
     <div className="fade-in">
       {/* Patient Welcome Card */}
-      <div style={{
-        background: 'linear-gradient(135deg, #0a2540 0%, #0f3966 100%)',
-        borderRadius: 20,
-        padding: '20px 22px',
-        color: '#ffffff',
-        marginBottom: 20,
-        boxShadow: '0 8px 24px rgba(10, 37, 64, 0.14)',
-        position: 'relative',
-        overflow: 'hidden',
-      }}>
-        <div style={{
-          position: 'absolute',
-          right: -20,
-          bottom: -20,
-          width: 140,
-          height: 140,
-          background: 'radial-gradient(circle, rgba(0, 168, 132, 0.28) 0%, transparent 70%)',
-          borderRadius: '50%',
-        }} />
-
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-          <span style={{
-            fontSize: '0.72rem',
-            fontWeight: 700,
-            letterSpacing: '0.06em',
-            textTransform: 'uppercase',
-            backgroundColor: 'rgba(255, 255, 255, 0.15)',
-            padding: '3px 9px',
-            borderRadius: 6,
-            fontFamily: 'var(--font-mono)',
-          }}>
-            {patient.patient_identifier}
-          </span>
-          <span style={{ fontSize: '0.78rem', color: '#6ee7b7', fontWeight: 600 }}>
-            ● Self-Owned Health Record
-          </span>
+      <div className="home-welcome page-heading">
+        <div className="home-welcome-meta">
+          <span className="home-patient-id">ID: {patient.patient_identifier}</span>
+          <span className="home-ownership"><ShieldCheck size={14} /> Self-Owned Health Record</span>
         </div>
-
-        <h2 style={{ fontSize: '1.4rem', color: '#ffffff', marginBottom: 4 }}>
+        <span className="page-eyebrow">Your personal health space</span>
+        <h1>
           Namaste, {patient.name.split(' ')[0]}
-        </h2>
-        <p style={{ fontSize: '0.86rem', color: '#cbd5e1', maxWidth: '85%' }}>
-          VaaniDoc simplifies your clinic visits, regional language symptom intake, and laboratory blood reports.
+        </h1>
+        <p>
+          Connect with your doctor, describe symptoms in your language, and keep your health records close.
         </p>
+        {activeEncounter?.status === 'OPEN' && activeEncounter?.intake?.patient_confirmed && (
+          <button className="btn btn-outline-teal home-resume" onClick={() => navigate('/waiting')}>
+            <Activity size={16} /> Return to your active visit <ArrowRight size={16} />
+          </button>
+        )}
       </div>
 
 
@@ -173,11 +153,10 @@ export function HomeScreen() {
           )}
 
           {/* Primary Action Card: SCAN QR */}
-          <div className="v-card" style={{
+          <div className="v-card home-scan-card" style={{
             padding: '24px 20px',
             textAlign: 'center',
             marginBottom: 24,
-            background: '#ffffff',
             border: '1.5px solid var(--border-subtle)',
             boxShadow: 'var(--shadow-md)',
           }}>
@@ -209,7 +188,7 @@ export function HomeScreen() {
               style={{ marginBottom: 16 }}
             >
               <QrCode size={20} />
-              Scan QR Code
+              Scan Reception QR
             </button>
 
             {/* Fallback Manual Code Entry */}
@@ -222,9 +201,10 @@ export function HomeScreen() {
                 or enter Clinic / Lab code manually:
               </span>
 
-              <form onSubmit={handleManualSubmit} style={{ display: 'flex', gap: 8 }}>
+              <form className="home-code-form" onSubmit={handleManualSubmit}>
                 <input
                   type="text"
+                  aria-label="Clinic or laboratory code"
                   placeholder="e.g. DOC-409 or LAB-808"
                   value={manualCode}
                   onChange={(e) => setManualCode(e.target.value)}
@@ -238,13 +218,13 @@ export function HomeScreen() {
                     textTransform: 'uppercase',
                   }}
                 />
-                <button type="submit" className="btn btn-secondary" style={{ padding: '10px 18px' }}>
-                  Continue
+                <button type="submit" disabled={isSubmitting || !manualCode.trim()} className="btn btn-secondary" style={{ padding: '10px 18px' }}>
+                  {isSubmitting ? 'Checking…' : 'Continue'}
                 </button>
               </form>
 
               {manualError && (
-                <div style={{
+                <div role="alert" style={{
                   marginTop: 10,
                   fontSize: '0.78rem',
                   color: '#dc2626',
@@ -279,12 +259,16 @@ export function HomeScreen() {
                 gap: 4,
               }}
             >
-              View All ({reports.length})
+              View All
               <ChevronRight size={14} />
             </button>
           </div>
 
-          {reports.length === 0 ? (
+          {loading ? (
+            <div className="v-card page-state" role="status"><Activity size={26} /><p>Loading your published records…</p></div>
+          ) : loadError ? (
+            <div className="v-card page-state page-state-error" role="alert"><AlertCircle size={26} /><p>{loadError}</p><button className="btn btn-secondary" onClick={loadHomeData}>Try again</button></div>
+          ) : reports.length === 0 ? (
             <div className="v-card" style={{ padding: 28, textAlign: 'center', color: 'var(--slate-500)' }}>
               <FileText size={36} style={{ margin: '0 auto 10px auto', opacity: 0.5 }} />
               <h4 style={{ fontSize: '0.95rem', color: 'var(--navy-900)', marginBottom: 4 }}>No Published Reports Yet</h4>
@@ -293,9 +277,10 @@ export function HomeScreen() {
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               {reports.map((rep) => (
-                <div
+                <button
+                  type="button"
                   key={rep._id}
-                  className="v-card"
+                  className="v-card record-card"
                   onClick={() => navigate(`/report/${rep._id}`)}
                   style={{
                     display: 'flex',
@@ -319,7 +304,7 @@ export function HomeScreen() {
                       <FileText size={20} />
                     </div>
                     <div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <div className="record-card-heading" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                         <strong style={{ fontSize: '0.94rem', color: 'var(--navy-900)' }}>{rep.test_type}</strong>
                         <StatusBadge status={rep.status} />
                       </div>
@@ -329,7 +314,7 @@ export function HomeScreen() {
                     </div>
                   </div>
                   <ChevronRight size={18} color="var(--slate-400)" />
-                </div>
+                </button>
               ))}
             </div>
           )}

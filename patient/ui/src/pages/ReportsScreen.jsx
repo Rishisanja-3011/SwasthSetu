@@ -10,6 +10,7 @@ import {
   CheckCircle2,
   Activity,
   Download,
+  AlertCircle,
 } from 'lucide-react';
 import { usePatient } from '../context/PatientContext';
 import { patientApi } from '../services/patientApi';
@@ -22,6 +23,7 @@ export function ReportsScreen() {
   const [reports, setReports] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [error, setError] = useState('');
 
   useEffect(() => {
     loadReports();
@@ -29,11 +31,12 @@ export function ReportsScreen() {
 
   const loadReports = async () => {
     setLoading(true);
+    setError('');
     try {
       const data = await patientApi.getPublishedReports();
       setReports(data);
     } catch (err) {
-      console.warn('Failed loading reports:', err);
+      setError(err.message || 'Your published reports could not be loaded.');
     } finally {
       setLoading(false);
     }
@@ -41,20 +44,21 @@ export function ReportsScreen() {
 
   const filteredReports = reports.filter(
     (r) =>
-      r.test_type.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      r.laboratory_name.toLowerCase().includes(searchTerm.toLowerCase())
+      (r.test_type || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (r.laboratory_name || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (
     <div className="fade-in" style={{ padding: '8px 0' }}>
-      <div style={{ marginBottom: 18 }}>
-        <h2 style={{ fontSize: '1.4rem', color: 'var(--navy-900)', marginBottom: 4 }}>
+      <header className="page-heading">
+        <span className="page-eyebrow">Your health, in your hands</span>
+        <h1>
           My Diagnostic Reports
-        </h2>
+        </h1>
         <p style={{ fontSize: '0.86rem', color: 'var(--slate-600)' }}>
           Published CBC blood reports owned by you. Available for yourself and authorized Revisiting doctors.
         </p>
-      </div>
+      </header>
 
       {/* Search Bar */}
       <div style={{ position: 'relative', marginBottom: 20 }}>
@@ -64,7 +68,8 @@ export function ReportsScreen() {
           style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)' }}
         />
         <input
-          type="text"
+          type="search"
+          aria-label="Search reports by test or laboratory"
           placeholder="Search by test or laboratory name..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
@@ -81,34 +86,38 @@ export function ReportsScreen() {
 
       {/* Reports Feed */}
       {loading ? (
-        <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--slate-500)' }}>
+        <div role="status" className="v-card" style={{ textAlign: 'center', padding: '40px 0', color: 'var(--slate-500)' }}>
           <div style={{ display: 'inline-block', width: 28, height: 28, border: '3px solid var(--teal-200)', borderTopColor: 'var(--teal-600)', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
           <p style={{ marginTop: 12, fontSize: '0.86rem' }}>Fetching published records...</p>
         </div>
+      ) : error ? (
+        <div className="v-card page-state page-state-error" role="alert"><AlertCircle size={30} /><p>{error}</p><button className="btn btn-secondary" onClick={loadReports}>Try again</button></div>
       ) : filteredReports.length === 0 ? (
         <div className="v-card" style={{ padding: '36px 20px', textAlign: 'center' }}>
           <FileText size={38} color="var(--slate-300)" style={{ margin: '0 auto 12px auto' }} />
-          <h4 style={{ fontSize: '1.05rem', color: 'var(--navy-900)', marginBottom: 4 }}>No Published Reports</h4>
+          <h4 style={{ fontSize: '1.05rem', color: 'var(--navy-900)', marginBottom: 4 }}>{searchTerm ? 'No matching reports' : 'No Published Reports'}</h4>
           <p style={{ fontSize: '0.84rem', color: 'var(--slate-500)' }}>
-            When an accredited lab publishes your CBC report, it appears here automatically.
+            {searchTerm ? 'Try a different test or laboratory name.' : 'When an accredited lab publishes your CBC report, it appears here automatically.'}
           </p>
+          {searchTerm && <button className="btn btn-secondary" style={{ marginTop: 14 }} onClick={() => setSearchTerm('')}>Clear search</button>}
         </div>
       ) : (
         <div className="reports-grid">
           {filteredReports.map((report) => (
-            <div
+            <button
+              type="button"
               key={report._id}
-              className="v-card"
+              className="v-card record-card"
               onClick={() => navigate(`/report/${report._id}`)}
               style={{
                 padding: '18px 18px',
                 cursor: 'pointer',
-                borderRadius: 16,
+                borderRadius: 'var(--radius-lg)',
               }}
             >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
+              <div className="record-card-heading" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
                 <div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8, marginBottom: 4 }}>
                     <h3 style={{ fontSize: '1.1rem', color: 'var(--navy-900)' }}>{report.test_type}</h3>
                     <StatusBadge status={report.status} />
                   </div>
@@ -149,7 +158,7 @@ export function ReportsScreen() {
                     >
                       <span style={{ color: 'var(--slate-600)' }}>{obs.test_name_normalized}:</span>
                       <strong style={{ color: 'var(--navy-900)' }}>{obs.value} {obs.unit}</strong>
-                      <span className={`status-pill ${obs.flag.toLowerCase()}`} style={{ fontSize: '0.62rem', padding: '1px 5px' }}>
+                      <span className={`status-pill ${(obs.flag || '').toLowerCase()}`} style={{ fontSize: '0.62rem', padding: '1px 5px' }}>
                         {obs.flag}
                       </span>
                     </div>
@@ -157,7 +166,7 @@ export function ReportsScreen() {
                 </div>
               )}
 
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.78rem', color: 'var(--slate-500)' }}>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, justifyContent: 'space-between', alignItems: 'center', fontSize: '0.78rem', color: 'var(--slate-500)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                   <Calendar size={13} />
                   <span>Published {new Date(report.published_at || report.created_at).toLocaleDateString()}</span>
@@ -168,7 +177,7 @@ export function ReportsScreen() {
                   <ChevronRight size={16} />
                 </div>
               </div>
-            </div>
+            </button>
           ))}
         </div>
       )}

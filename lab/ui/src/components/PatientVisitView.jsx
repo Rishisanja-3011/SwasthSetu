@@ -2,21 +2,47 @@ import React, { useState } from 'react';
 import {
   User,
   ShieldCheck,
-  ArrowRight,
   ArrowLeft,
   FileText,
   UploadCloud,
   Clock,
   CheckCircle,
 } from 'lucide-react';
+import { DemoReportSelector } from './DemoReportSelector';
 
 export default function PatientVisitView({
   identityData,
   onUploadReport,
   isProcessing,
   onBackToDashboard,
+  onOpenReport,
+  existingReportId,
+  grantKey,
 }) {
   const [selectedFile, setSelectedFile] = useState(null);
+
+  if (existingReportId) {
+    return (
+      <div className="clinical-card" style={{ textAlign: 'center', padding: '3rem 1.25rem' }}>
+        <FileText size={30} color="var(--teal-700)" style={{ marginBottom: '0.75rem' }} />
+        <h2 style={{ fontSize: '1.15rem', color: 'var(--text-main)', marginBottom: '0.45rem' }}>
+          Report already uploaded
+        </h2>
+        <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', maxWidth: '34rem', margin: '0 auto' }}>
+          This access grant has a preserved laboratory report. The original report is immutable and cannot be replaced with another upload under the same grant.
+        </p>
+        <div style={{ display: 'flex', justifyContent: 'center', gap: '0.75rem', flexWrap: 'wrap', marginTop: '1.25rem' }}>
+          <button className="btn-clinical primary" onClick={onOpenReport}>
+            <FileText size={15} />
+            <span>Open Preserved Report</span>
+          </button>
+          <button className="btn-clinical outline" onClick={onBackToDashboard}>
+            Return to Dashboard
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   if (!identityData) {
     return (
@@ -52,6 +78,8 @@ export default function PatientVisitView({
       rawFile: selectedFile?.rawFile,
     });
   };
+
+  const selectDemoReport = (file) => setSelectedFile({ ...file });
 
   return (
     <div>
@@ -184,8 +212,9 @@ export default function PatientVisitView({
             </p>
           </div>
         ) : (
-          <div>
-            {/* File Chooser Box */}
+           <div>
+            <DemoReportSelector identity={identity} onSelect={selectDemoReport} />
+             {/* File Chooser Box */}
             <div
               style={{
                 border: '1.5px dashed var(--border-medium)',
@@ -197,6 +226,7 @@ export default function PatientVisitView({
               }}
             >
               <input
+                key={grantKey || 'no-grant'}
                 type="file"
                 id="report-file-input"
                 accept=".pdf"

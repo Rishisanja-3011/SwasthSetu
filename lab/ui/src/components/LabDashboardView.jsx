@@ -1,25 +1,41 @@
 import React from 'react';
-import { Users, Clock, AlertTriangle, CheckCircle, ArrowRight } from 'lucide-react';
+import { Users, Clock, AlertTriangle, CheckCircle, ArrowRight, RefreshCw } from 'lucide-react';
 
 export default function LabDashboardView({
   metrics,
   worklist,
   onOpenPatientVisit,
   onOpenReport,
+  onRefresh,
+  isRefreshing,
 }) {
   return (
     <div>
       {/* Page Title with VaaniDoc Section Tag (Matching Image 2) */}
-      <div style={{ marginBottom: '1.75rem' }}>
-        <div style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--teal-brand)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '0.35rem' }}>
-          LABORATORY WORKSPACE
+      <div style={{ marginBottom: '1.75rem', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
+        <div>
+          <div style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--teal-brand)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '0.35rem' }}>
+            LABORATORY WORKSPACE
+          </div>
+          <h2 style={{ fontSize: '1.65rem', fontWeight: 800, color: 'var(--navy-900)', letterSpacing: '-0.025em' }}>
+            Diagnostic Operations Dashboard
+          </h2>
+          <p style={{ fontSize: '0.88rem', color: 'var(--text-muted)' }}>
+            Active patient visits, report processing queue, and clinical sign-off status
+          </p>
         </div>
-        <h2 style={{ fontSize: '1.65rem', fontWeight: 800, color: 'var(--navy-900)', letterSpacing: '-0.025em' }}>
-          Diagnostic Operations Dashboard
-        </h2>
-        <p style={{ fontSize: '0.88rem', color: 'var(--text-muted)' }}>
-          Active patient visits, report processing queue, and clinical sign-off status
-        </p>
+        <button
+          type="button"
+          className="btn-clinical outline"
+          onClick={onRefresh}
+          disabled={isRefreshing}
+          title="Refresh approved patient grants and report status"
+          aria-label="Refresh dashboard"
+          style={{ padding: '0.5rem 0.8rem', fontSize: '0.8rem' }}
+        >
+          <RefreshCw size={14} className={isRefreshing ? 'animate-spin' : ''} />
+          <span>{isRefreshing ? 'Refreshing…' : 'Refresh dashboard'}</span>
+        </button>
       </div>
 
       {/* 4 Simple Operational Summary Cards (Matching Image 2 Card Style) */}

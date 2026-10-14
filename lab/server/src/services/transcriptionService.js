@@ -1,6 +1,7 @@
 const { detectLanguage, normalizeLanguage } = require('./languageService');
 
-const DEFAULT_MODEL = process.env.GEMINI_MODEL || 'gemini-2.0-flash';
+const TRANSCRIPTION_TIMEOUT_MS = 15000;
+const MAX_TRANSCRIPT_LENGTH = 8000;
 const SUPPORTED_AUDIO_MIME_TYPES = new Set([
   'audio/webm',
   'audio/mp4',
@@ -26,8 +27,10 @@ function normalizeMimeType(value) {
 }
 
 function parseModelResponse(payload) {
-  const text = payload?.candidates?.[0]?.content?.parts
-    ?.map((part) => part.text || '')
+  const parts = payload?.candidates?.[0]?.content?.parts;
+  if (!Array.isArray(parts)) throw new TranscriptionError('The transcription service returned an invalid response.', 'INVALID_TRANSCRIPTION_RESPONSE');
+  const text = parts
+    .map((part) => typeof part?.text === 'string' ? part.text : '')
     .join('')
     .trim() || '';
   if (!text) throw new TranscriptionError('The transcription service returned no transcript.', 'EMPTY_TRANSCRIPT');
@@ -37,13 +40,15 @@ function parseModelResponse(payload) {
     const cleaned = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
     parsed = JSON.parse(cleaned);
   } catch {
-    // A plain response is still a verbatim transcript. No summarization or
-    // clinical interpretation is performed in this service.
-    parsed = { transcript: text, language: '' };
+    throw new TranscriptionError('The transcription service returned an invalid response.', 'INVALID_TRANSCRIPTION_RESPONSE');
   }
 
-  const transcript = typeof parsed.transcript === 'string' ? parsed.transcript : '';
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed) || typeof parsed.transcript !== 'string') {
+    throw new TranscriptionError('The transcription service returned an invalid response.', 'INVALID_TRANSCRIPTION_RESPONSE');
+  }
+  const transcript = parsed.transcript;
   if (!transcript.trim()) throw new TranscriptionError('The transcription service returned an empty transcript.', 'EMPTY_TRANSCRIPT');
+  if (transcript.length > MAX_TRANSCRIPT_LENGTH) throw new TranscriptionError('The transcript exceeds the intake text limit.', 'TRANSCRIPT_TOO_LARGE');
   const detected = normalizeLanguage(parsed.language, null) || detectLanguage(transcript, null).language;
   if (!detected) throw new TranscriptionError('The spoken language could not be detected.', 'LANGUAGE_NOT_DETECTED');
   return {
@@ -81,10 +86,14 @@ async function transcribeAudio({ audioBuffer, mimeType, preferredLanguage }) {
   const languageHint = selected
     ? `The patient selected ${selected} as a preferred language. Use it as a hint only; detect a different spoken language when the audio clearly uses one.`
     : 'Detect the spoken language from the audio.';
-  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(DEFAULT_MODEL)}:generateContent?key=${encodeURIComponent(apiKey)}`;
+  const model = process.env.GEMINI_MODEL || 'gemini-2.0-flash';
+  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), TRANSCRIPTION_TIMEOUT_MS);
   try {
     const response = await fetch(endpoint, {
       method: 'POST',
+      signal: controller.signal,
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
         contents: [{
@@ -100,18 +109,21 @@ async function transcribeAudio({ audioBuffer, mimeType, preferredLanguage }) {
             },
           ],
         }],
-        generationConfig: { temperature: 0 },
+        generationConfig: { temperature: 0, responseMimeType: 'application/json' },
       }),
     });
 
     if (!response.ok) {
       throw new TranscriptionError('The server transcription service could not process this recording.', 'TRANSCRIPTION_PROVIDER_FAILED');
     }
-    const payload = await response.json().catch(() => null);
+    const payload = await response.json();
     return parseModelResponse(payload);
   } catch (error) {
+    if (controller.signal.aborted) throw new TranscriptionError('Server voice transcription timed out. Please retry or use typed text.', 'TRANSCRIPTION_TIMEOUT');
     if (error instanceof TranscriptionError) throw error;
     throw new TranscriptionError('The server transcription service is temporarily unavailable.', 'TRANSCRIPTION_PROVIDER_FAILED');
+  } finally {
+    clearTimeout(timeout);
   }
 }
 
