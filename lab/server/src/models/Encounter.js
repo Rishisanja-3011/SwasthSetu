@@ -49,5 +49,12 @@ const encounterSchema = new mongoose.Schema({
 
 encounterSchema.index({ doctor_id: 1, status: 1, created_at: 1 });
 encounterSchema.index({ patient_id: 1, doctor_id: 1, created_at: -1 });
+// A patient may have only one open consultation at a time. The route-level
+// check gives callers the current encounter; this partial unique index closes
+// the race between two simultaneous starts.
+encounterSchema.index(
+  { patient_id: 1 },
+  { unique: true, partialFilterExpression: { status: 'OPEN' } },
+);
 
 module.exports = mongoose.model('Encounter', encounterSchema);

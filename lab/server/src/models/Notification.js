@@ -9,7 +9,7 @@ const notificationSchema = new mongoose.Schema({
   encounter_id: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Encounter',
-    required: true,
+    default: null,
   },
   patient_id: {
     type: mongoose.Schema.Types.ObjectId,
@@ -18,7 +18,7 @@ const notificationSchema = new mongoose.Schema({
   },
   type: {
     type: String,
-    enum: ['REVISITING_PATIENT_JOINED', 'NEW_PATIENT_JOINED', 'DIAGNOSTIC_ORDER_CREATED'],
+    enum: ['REVISITING_PATIENT_JOINED', 'NEW_PATIENT_JOINED', 'DIAGNOSTIC_ORDER_CREATED', 'REPORT_PUBLISHED'],
     required: true,
   },
   title: {
@@ -32,7 +32,7 @@ const notificationSchema = new mongoose.Schema({
   visit_type: {
     type: String,
     enum: ['NEW', 'REVISITING'],
-    required: true,
+    default: null,
   },
   token_number: {
     type: String,
@@ -41,6 +41,16 @@ const notificationSchema = new mongoose.Schema({
   diagnostic_order_id: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'DiagnosticOrder',
+    default: null,
+  },
+  report_id: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'DiagnosticReport',
+    default: null,
+  },
+  lab_access_grant_id: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'LabAccessGrant',
     default: null,
   },
   read: {
